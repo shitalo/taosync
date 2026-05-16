@@ -1,6 +1,6 @@
 """
-@Author：dr34m
-@Date  ：2024/7/9 17:18 
+@Author: dr34m
+@Date: 2024/7/9 17:18
 """
 from common import sqlBase
 from common.LNG import G
@@ -30,8 +30,8 @@ def getJobById(jobId):
 
 def getJobByTaskId(taskId):
     """
-    通过任务id获取作业详情
-    :param taskId: 任务id
+    通过任务 id 获取作业详情
+    :param taskId: 任务 id
     :return:
     """
     rst = sqlBase.fetchall_to_table("select * from job where id in (select jobId from job_task where id = ?)",
@@ -44,28 +44,28 @@ def getJobByTaskId(taskId):
 
 def addJob(job):
     # 新增作业
-    return sqlBase.execute_insert("insert into job (enable, remark, srcPath, dstPath, alistId, useCacheT, "
+    return sqlBase.execute_insert("insert into job (enable, remark, srcPath, dstPath, openlistId, useCacheT, "
                                   "scanIntervalT, useCacheS, scanIntervalS, method, interval"
                                   ",isCron, year, month, day, week, day_of_week, hour, minute, second, "
-                                  "start_date, end_date, exclude) "
-                                  "VALUES (:enable, :remark, :srcPath, :dstPath, :alistId, :useCacheT, "
+                                  "start_date, end_date, exclude, timeWindow) "
+                                  "VALUES (:enable, :remark, :srcPath, :dstPath, :openlistId, :useCacheT, "
                                   ":scanIntervalT, :useCacheS, :scanIntervalS, :method, :interval, "
                                   ":isCron, :year, :month, :day, :week, :day_of_week, :hour, :minute, :second, "
-                                  ":start_date, :end_date, :exclude)", job)
+                                  ":start_date, :end_date, :exclude, :timeWindow)", job)
 
 
 def updateJob(job):
     # 更新作业
-    sqlBase.execute_update("update job set enable=:enable, remark=:remark, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
+    sqlBase.execute_update("update job set enable=:enable, remark=:remark, srcPath=:srcPath, dstPath=:dstPath, openlistId=:openlistId, "
                            " useCacheT=:useCacheT, scanIntervalT=:scanIntervalT, useCacheS=:useCacheS, scanIntervalS=:scanIntervalS, "
                            "method=:method, interval=:interval, isCron=:isCron, year=:year, "
                            "month=:month, day=:day, week=:week, day_of_week=:day_of_week, hour=:hour, minute=:minute, "
-                           "second=:second, start_date=:start_date, end_date=:end_date, exclude=:exclude where id=:id",
+                           "second=:second, start_date=:start_date, end_date=:end_date, exclude=:exclude, timeWindow=:timeWindow where id=:id",
                            job)
 
 
 def updateJobEnable(jobId, enable):
-    # 更新作业执行状态
+    # 更新作业启用状态
     sqlBase.execute_update("update job set enable = ? where id = ?", (enable, jobId))
 
 
@@ -79,7 +79,7 @@ def deleteJob(jobId):
 
 def updateJobTaskNumMany(taskNums):
     """
-    批量更新任务的结果数量
+    批量更新任务结果数量
     :param taskNums: [{
         'taskId': 1,
         'taskNum': ""
@@ -126,12 +126,12 @@ def updateJobTaskStatus(taskId, status, errMsg=None):
 
 
 def updateJobTaskStatusByStatus():
-    # 用于重启后，更新所有未完成的任务为中止
+    # 用于重启后，将所有未完成任务标记为中止
     sqlBase.execute_update("update job_task set status=4 where status in (0, 1)")
 
 
 def updateJobTaskStatusByStatusAndJobId(jobId):
-    # 用于任务禁用，更新所有未完成的任务为中止
+    # 用于作业禁用后，将该作业的未完成任务标记为中止
     sqlBase.execute_update("update job_task set status=4 where status in (0, 1) and jobId=?", (jobId,))
 
 
@@ -148,8 +148,8 @@ def deleteJobTaskByRunTime(runTime):
 
 def addJobTaskItemMany(jobTaskItemList):
     sqlBase.execute_manny(
-        "insert into job_task_item (taskId, srcPath, dstPath, isPath, fileName, fileSize, type, alistTaskId, status, errMsg) "
-        "VALUES (:taskId, :srcPath, :dstPath, :isPath, :fileName, :fileSize, :type, :alistTaskId, :status, :errMsg)",
+        "insert into job_task_item (taskId, srcPath, dstPath, isPath, fileName, fileSize, type, openlistTaskId, status, errMsg) "
+        "VALUES (:taskId, :srcPath, :dstPath, :isPath, :fileName, :fileSize, :type, :openlistTaskId, :status, :errMsg)",
         jobTaskItemList)
 
 
@@ -175,6 +175,7 @@ def updateJobTaskItemStatusByIdMany(taskList):
                           "where id=:id", taskList)
 
 
-def updateJobTaskItemByAlistTaskId(alistTaskId, status, progress):
+def updateJobTaskItemByOpenListTaskId(openlistTaskId, status, progress):
     sqlBase.execute_update("update job_task_item set status=?, progress=? "
-                           "where alistTaskId=?", (status, progress, alistTaskId))
+                           "where openlistTaskId=?", (status, progress, openlistTaskId))
+

@@ -1,14 +1,15 @@
 """
-@Author：dr34m
-@Date  ：2024/7/9 17:17 
+@Author: Dr34m
+@Date  : 2024/7/9 17:17
 """
+import json
 import logging
 
 from common.LNG import G
 from mapper import jobMapper
 from service.syncJob import jobClient
 
-# 作业客户端列表，key为jobId,value为jobClient
+# 作业客户端列表，key 为 jobId，value 为 jobClient
 jobClientList = {}
 
 
@@ -22,7 +23,7 @@ def initJob():
     jobList = jobMapper.getJobList()
     for item in jobList:
         try:
-            logger.info(f"正在添加jobId为{item['id']}的任务")
+            logger.info(f"正在添加 jobId 为 {item['id']} 的任务")
             addJobClient(item, True)
         except Exception as e:
             logger.error(f"添加任务过程中报错")
@@ -53,13 +54,17 @@ def cleanJobInput(job):
     """
     if job['isCron'] == 2 and job['enable'] != 1:
         job['enable'] = 1
+    if 'timeWindow' not in job:
+        job['timeWindow'] = None
+    if isinstance(job.get('timeWindow'), (dict, list)):
+        job['timeWindow'] = json.dumps(job['timeWindow'], ensure_ascii=False)
     for key, value in job.items():
         if type(value) == str:
             if value.strip() == '':
                 job[key] = None
             else:
                 job[key] = value.strip()
-    if job['exclude'] is not None:
+    if job.get('exclude') is not None:
         job['exclude'] = ":".join([item.strip() for item in job['exclude'].split(':')])
 
 
@@ -71,7 +76,7 @@ def addJobClient(job, isInit=False):
         enable: 1,
         srcPath: '',
         dstPath: '',
-        alistId: null,
+        openlistId: null,
         speed: 0,
         method: 0,
         interval: 60
@@ -92,7 +97,7 @@ def editJobClient(job):
         enable: 1,
         srcPath: '',
         dstPath: '',
-        alistId: null,
+        openlistId: null,
         speed: 0,
         method: 0,
         interval: 60
@@ -181,6 +186,28 @@ def abortJob(jobId):
     client.abortJob()
 
 
+def appendJobRunningState(result):
+    """
+    为作业列表附加当前执行状态，避免前端逐个请求任务详情。
+    """
+    if isinstance(result, dict):
+        job_list = result.get('dataList', [])
+    else:
+        job_list = result
+    for job in job_list:
+        job_id = int(job['id'])
+        client = jobClientList.get(job_id)
+        task_client = client.currentJobTask if client is not None else None
+        job['runningTask'] = task_client is not None
+        if task_client is not None:
+            current = task_client.getCurrent()
+            job['runningTaskId'] = task_client.taskId
+            job['runningTaskCreateTime'] = current.get('createTime')
+            job['runningTaskNum'] = current.get('num', {})
+            job['runningTaskScanFinish'] = current.get('scanFinish')
+    return result
+
+
 def getJobList(req):
     """
     作业列表
@@ -190,7 +217,7 @@ def getJobList(req):
     }
     :return:
     """
-    return jobMapper.getJobList(req)
+    return appendJobRunningState(jobMapper.getJobList(req))
 
 
 def getJobCurrent(jobId, status=None):
@@ -205,6 +232,5 @@ def getJobCurrent(jobId, status=None):
     if taskClient is not None:
         if status is None:
             return taskClient.getCurrent()
-        else:
-            return taskClient.getCurrentByStatus(int(status))
+        return taskClient.getCurrentByStatus(int(status))
     return None

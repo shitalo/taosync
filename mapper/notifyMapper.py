@@ -1,13 +1,16 @@
 from common import sqlBase
 
 
-def getNotifyList(needEnable=False):
+def getNotifyList(needEnable=False, params=None):
     """
     获取通知配置列表
     :param needEnable:
     :return:
     """
-    return sqlBase.fetchall_to_table(f"select * from notify{' where enable = 1' if needEnable else ''}")
+    query = f"select * from notify{' where enable = 1' if needEnable else ''} order by createTime desc"
+    if params is not None and ('pageNum' in params or 'pageSize' in params):
+        return sqlBase.fetchall_to_page(query, params)
+    return sqlBase.fetchall_to_table(query)
 
 
 def addNotify(notify):

@@ -1,35 +1,36 @@
 import request from '@/utils/request'
 
-// alist列表
-export function alistGet() {
+// openlist列表
+export function openlistGet(params) {
 	return request({
-		url: '/alist',
+		url: '/openlist',
 		headers: {
 			isMask: false
 		},
-		method: 'get'
+		method: 'get',
+		params
 	})
 }
 
-// alist子目录
-export function alistGetPath(alistId, path) {
+// openlist子目录
+export function openlistGetPath(openlistId, path) {
 	return request({
-		url: '/alist',
+		url: '/openlist',
 		headers: {
 			isMask: false
 		},
 		method: 'get',
 		params: {
-			alistId,
+			openlistId,
 			path
 		}
 	})
 }
 
-// alist新增
-export function alistPost(data) {
+// openlist新增
+export function openlistPost(data) {
 	return request({
-		url: '/alist',
+		url: '/openlist',
 		headers: {
 			isMask: false
 		},
@@ -38,10 +39,10 @@ export function alistPost(data) {
 	})
 }
 
-// alist修改
-export function alistPut(data) {
+// openlist修改
+export function openlistPut(data) {
 	return request({
-		url: '/alist',
+		url: '/openlist',
 		headers: {
 			isMask: false
 		},
@@ -50,10 +51,10 @@ export function alistPut(data) {
 	})
 }
 
-// 删除alist
-export function alistDelete(id) {
+// 删除openlist
+export function openlistDelete(id) {
 	return request({
-		url: '/alist',
+		url: '/openlist',
 		headers: {
 			isMask: false
 		},

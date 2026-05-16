@@ -2,7 +2,7 @@
 	<div class="taskDetail">
 		<div class="top-box">
 			<div style="display: flex; align-items: center;">
-				<el-button type="primary" icon="el-icon-back" @click="goback" size="small"
+				<el-button class="tao-back-button" type="primary" icon="el-icon-back" @click="goback" size="small"
 					style="margin-right: 12px;">返回</el-button>
 				<el-select v-model="params.status" placeholder="筛选状态" @change="getTaskItemList" clearable
 					style="margin-right: 12px;width: 160px;">
@@ -96,12 +96,17 @@
 		height: 100%;
 		padding: 16px;
 		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		overflow: hidden;
 
 		.top-box {
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
 			margin-bottom: 16px;
+			flex: 0 0 auto;
 
 			.top-box-title {
 				font-weight: bold;
@@ -110,7 +115,47 @@
 
 		.table-page-box {
 			width: 100%;
-			height: calc(100% - 54px);
+			flex: 1 1 auto;
+			min-height: 0;
+			height: auto;
+		}
+	}
+
+	// 移动端适配
+	@media (max-width: 768px) {
+		.taskDetail {
+			padding: 12px;
+
+			.top-box {
+				flex-wrap: wrap;
+				gap: 8px;
+
+				.top-box-title {
+					font-size: 16px;
+				}
+
+				> div:first-child {
+					width: 100%;
+					flex-wrap: wrap;
+					gap: 8px;
+
+					.el-button,
+					.el-select {
+						font-size: 12px;
+					}
+
+					.el-select {
+						width: calc(50% - 4px) !important;
+						margin-right: 0 !important;
+					}
+				}
+			}
+
+			.table-page-box {
+				flex: 1 1 auto;
+				min-height: 0;
+				height: auto;
+			}
 		}
 	}
 </style>

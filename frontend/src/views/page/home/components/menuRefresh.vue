@@ -30,6 +30,10 @@
 			refreshText: {
 				type: String,
 				default: '自动刷新'
+			},
+			persistKey: {
+				type: String,
+				default: ''
 			}
 		},
 		data() {
@@ -39,7 +43,7 @@
 			};
 		},
 		created() {
-			this.refreshStatus = this.autoRefresh;
+			this.refreshStatus = this.getInitialRefreshStatus();
 			if (this.refreshStatus) {
 				this.startRefresh();
 			} else {
@@ -50,8 +54,37 @@
 			this.destroy();
 		},
 		methods: {
+			getInitialRefreshStatus() {
+				if (!this.persistKey || !window.localStorage) {
+					return this.autoRefresh;
+				}
+
+				try {
+					const savedStatus = window.localStorage.getItem(this.persistKey);
+					if (savedStatus === '1' || savedStatus === 'true') {
+						return true;
+					}
+					if (savedStatus === '0' || savedStatus === 'false') {
+						return false;
+					}
+				} catch (e) {
+					return this.autoRefresh;
+				}
+
+				return this.autoRefresh;
+			},
+			persistRefreshStatus(val) {
+				if (!this.persistKey || !window.localStorage) {
+					return;
+				}
+
+				try {
+					window.localStorage.setItem(this.persistKey, val ? '1' : '0');
+				} catch (e) {}
+			},
 			refreshChange(val) {
 				this.refreshStatus = val;
+				this.persistRefreshStatus(val);
 				if (val) {
 					this.startRefresh();
 				} else {
@@ -73,6 +106,7 @@
 			destroy() {
 				if (this.timer) {
 					clearInterval(this.timer);
+					this.timer = null;
 				}
 			}
 		}
@@ -96,7 +130,12 @@
 
 		.el-icon-refresh-right {
 			cursor: pointer;
-			color: #1890ff;
+			color: var(--link-color);
+			transition: color 0.2s ease;
+			
+			&:hover {
+				color: var(--link-hover-color);
+			}
 		}
 
 		.el-icon-loading {

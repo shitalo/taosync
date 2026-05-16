@@ -1,5 +1,6 @@
 .idea/
 .vscode/
+.venv/
 
 tst-*.py
 
@@ -12,6 +13,8 @@ venv/
 
 build/
 dist/
+frontend/dist/
+frontend/dist-*/
 data/
 
 node_modules/

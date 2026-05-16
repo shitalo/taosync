@@ -1,13 +1,14 @@
 import request from '@/utils/request'
 
 // 通知列表
-export function getNotifyList() {
+export function getNotifyList(params) {
 	return request({
 		url: '/notify',
 		headers: {
 			isMask: false
 		},
-		method: 'get'
+		method: 'get',
+		params
 	})
 }
 

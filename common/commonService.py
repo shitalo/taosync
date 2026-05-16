@@ -1,9 +1,13 @@
 import datetime
 import json
 import logging
+import sys
+import threading
 
 from common.LNG import G
 from common.config import getConfig
+
+SENSITIVE_KEYS = {'passwd', 'password', 'token', 'authorization', 'cookie', 'secret', 'sendkey'}
 
 
 # 日志规定
@@ -25,7 +29,7 @@ def setLogger(cusLevel=None):
         # 仅在起始是长度为1或0，之后均为2
         if handlersLen == 1:
             logger.removeHandler(logger.handlers[0])
-        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+        formatter = logging.Formatter('%(asctime)s %(levelname)s [%(threadName)s] %(message)s')
         handlerStream = logging.StreamHandler()
         handlerStream.setLevel(consoleLevel)
         handlerStream.setFormatter(formatter)
@@ -34,9 +38,57 @@ def setLogger(cusLevel=None):
         logger.removeHandler(logger.handlers[1])
     handlerFile = logging.FileHandler(log_file, encoding='utf-8')
     handlerFile.setLevel(level)
-    formatter = logging.Formatter('%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s')
+    formatter = logging.Formatter(
+        '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s [%(threadName)s] %(message)s'
+    )
     handlerFile.setFormatter(formatter)
     logger.addHandler(handlerFile)
+
+
+def mask_sensitive_data(value):
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if str(key).lower() in SENSITIVE_KEYS:
+                result[key] = '***'
+            else:
+                result[key] = mask_sensitive_data(item)
+        return result
+    if isinstance(value, list):
+        return [mask_sensitive_data(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(mask_sensitive_data(item) for item in value)
+    return value
+
+
+def dump_for_log(value, limit=1000):
+    try:
+        text = json.dumps(mask_sensitive_data(value), ensure_ascii=False, default=str)
+    except Exception:
+        text = str(value)
+    if len(text) > limit:
+        return text[:limit] + '...(truncated)'
+    return text
+
+
+def install_global_exception_logger():
+    logger = logging.getLogger()
+
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        logger.critical("Unhandled exception in main thread", exc_info=(exc_type, exc_value, exc_traceback))
+
+    def handle_thread_exception(args):
+        logger.critical(
+            "Unhandled exception in thread %s",
+            getattr(args.thread, 'name', 'unknown'),
+            exc_info=(args.exc_type, args.exc_value, args.exc_traceback)
+        )
+
+    sys.excepthook = handle_exception
+    threading.excepthook = handle_thread_exception
 
 
 def get_post_data(self):

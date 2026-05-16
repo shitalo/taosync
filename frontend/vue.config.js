@@ -1,5 +1,29 @@
 module.exports = {
 	productionSourceMap: false,
+	configureWebpack: {
+		optimization: {
+			splitChunks: {
+				chunks: 'all',
+				cacheGroups: {
+					elementUI: {
+						name: 'chunk-element-ui',
+						test: /[\\/]node_modules[\\/]element-ui[\\/]/,
+						priority: 30
+					},
+					echarts: {
+						name: 'chunk-echarts',
+						test: /[\\/]node_modules[\\/]echarts[\\/]/,
+						priority: 25
+					},
+					vendors: {
+						name: 'chunk-vendors',
+						test: /[\\/]node_modules[\\/]/,
+						priority: 10
+					}
+				}
+			}
+		}
+	},
 	devServer: {
 		host: '0.0.0.0',
 		port: 80,

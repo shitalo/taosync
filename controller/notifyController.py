@@ -1,6 +1,6 @@
 """
-@Author：dr34m
-@Date  ：2024/11/21 20:05
+@Author: dr34m
+@Date: 2024/11/21 20:05
 """
 from concurrent.futures import ThreadPoolExecutor
 
@@ -16,7 +16,7 @@ class Notify(BaseHandler):
     @run_on_executor
     @handle_request
     def get(self, req):
-        return notifyService.getNotifyList()
+        return notifyService.getNotifyList(False, req)
 
     @run_on_executor
     @handle_request

@@ -1,6 +1,6 @@
 <div align="center">
   <a href=""><img width="200px" alt="logo" src="frontend/public/logo-200-64.png"/></a>
-  <p><em>TaoSync是一个适用于OpenList/AList v3+的自动化同步工具。</em></p>
+  <p><em>TaoSync是一个适用于OpenList v3+的自动化同步工具。</em></p>
   <div>
     <a href="https://github.com/dr34m-cn/taosync/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/dr34m-cn/taosync" alt="License" />
@@ -109,10 +109,10 @@
 * 支持Docker，下载即用
 * 干净卸载，不用的时候删掉即可，无任何残留或依赖，不影响系统里其他程序
 * 密码加密不可逆，永远不会泄露您的密码，敏感信息均被加密，支持重置密码
-* 完全离线运行（仅连接AList），永不上传用户隐私
+* 完全离线运行（仅连接OpenList），永不上传用户隐私
 * 完善的错误处理，稳定可靠，逻辑自洽；可能出错，但永不崩溃（我猜的）
 * 完善的日志，所有错误都会被记录
-* 引擎管理，可以自由增删改查`OpenList/AList`
+* 引擎管理，可以自由增删改查`OpenList`
 * 作业管理，可以新增/删除/启用/禁用/编辑/手动执行作业
 * 支持排除项规则，可以排除指定目录或文件不同步
 * 仅新增、全同步、移动三种模式
@@ -167,7 +167,7 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 # 运行端口号
 port=8023
 # 登录有效期，单位天
-expires=2
+expires=9999
 # 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2
 log_level=1
 # 控制台日志等级：适用于v0.2.3及之后版本，与上同
@@ -175,9 +175,27 @@ console_level=2
 # 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理
 log_save=7
 # 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理
-task_save=0
+task_save=30
 # 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多
 task_timeout=72
+# 同步文件最大并发数，建议 3-8，网络波动较大时可适当调小
+copy_parallel=5
+# OpenList 请求的连接超时，单位秒，适用于所有请求
+openlist_connect_timeout=15
+# OpenList 普通请求的读取超时，单位秒，主要影响目录扫描、复制等接口
+openlist_read_timeout=60
+# 单个任务状态查询（copy/info）的读取超时，单位秒
+openlist_status_timeout=30
+# 任务列表查询（copy/undone、copy/done）的读取超时，单位秒
+openlist_task_list_timeout=45
+# 用户正在查看任务时的快速状态轮询间隔，单位秒，建议 2-5
+status_query_fast_interval=3
+# 没有人在查看任务时的后台状态轮询间隔，单位秒，建议 8-15
+status_query_slow_interval=20
+# 目录扫描超时后的首次退避时间，单位秒；同一路径连续超时会指数退避
+scan_retry_backoff_base=60
+# 目录扫描退避时间上限，单位秒
+scan_retry_backoff_max=1800
 ```
 
 上边的文件默认不存在，如需要，您可以手动在程序同级目录的`data`目录下创建`config.ini`，并填入上边的内容。注意，文件应使用`UTF-8`编码
@@ -185,12 +203,21 @@ task_timeout=72
 | config.ini    | Docker环境变量    | 描述                                                         | 默认值           |
 | ------------- | ----------------- | ------------------------------------------------------------ |---------------|
 | port          | TAO_PORT          | 运行端口号                                                   | 8023          |
-| expires       | TAO_EXPIRES       | 登录有效期，单位天                                           | 2             |
+| expires       | TAO_EXPIRES       | 登录有效期，单位天                                           | 9999          |
 | log_level     | TAO_LOG_LEVEL     | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1             |
 | console_level | TAO_CONSOLE_LEVEL | 控制台日志等级：适用于v0.2.3及之后版本；与上同               | 2             |
 | log_save      | TAO_LOG_SAVE      | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7             |
-| task_save     | TAO_TASK_SAVE     | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0             |
+| task_save     | TAO_TASK_SAVE     | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 30             |
 | task_timeout  | TAO_TASK_TIMEOUT  | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
+| copy_parallel | TAO_COPY_PARALLEL | 同时提交到 OpenList 的最大文件同步并发数；网络不稳定时建议适当调小 | 5             |
+| openlist_connect_timeout | TAO_OPENLIST_CONNECT_TIMEOUT | OpenList 请求的连接超时，单位秒，适用于所有请求 | 15 |
+| openlist_read_timeout | TAO_OPENLIST_READ_TIMEOUT | OpenList 普通请求的读取超时，单位秒，主要影响目录扫描、复制等接口 | 60 |
+| openlist_status_timeout | TAO_OPENLIST_STATUS_TIMEOUT | 单个任务状态查询（copy/info）的读取超时，单位秒 | 30 |
+| openlist_task_list_timeout | TAO_OPENLIST_TASK_LIST_TIMEOUT | 任务列表查询（copy/undone、copy/done）的读取超时，单位秒 | 45 |
+| status_query_fast_interval | TAO_STATUS_QUERY_FAST_INTERVAL | 用户正在查看任务时的快速状态轮询间隔，单位秒 | 3 |
+| status_query_slow_interval | TAO_STATUS_QUERY_SLOW_INTERVAL | 没有人在查看任务时的后台状态轮询间隔，单位秒 | 20 |
+| scan_retry_backoff_base | TAO_SCAN_RETRY_BACKOFF_BASE | 目录扫描超时后的首次退避时间，单位秒 | 60 |
+| scan_retry_backoff_max | TAO_SCAN_RETRY_BACKOFF_MAX | 目录扫描退避时间上限，单位秒 | 1800 |
 | -             | TZ                | 时区                                                         | Asia/Shanghai |
 
 </details>

@@ -7,13 +7,13 @@ from mapper import notifyMapper
 from service.notify import sc
 
 
-def getNotifyList(needEnable=False):
+def getNotifyList(needEnable=False, req=None):
     """
     获取通知配置列表
     :param needEnable: 是否启用
     :return:
     """
-    return notifyMapper.getNotifyList(needEnable)
+    return notifyMapper.getNotifyList(needEnable, req)
 
 
 def addNewNotify(notify):

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<div class="user">
 		<div class="user-info">
 			<template v-if="vuex_userInfo">
@@ -103,116 +103,137 @@
 
 <style lang="scss" scoped>
 	.user {
-		padding: 32px;
-		font-size: 16px;
-		width: 100%;
+		min-height: 100%;
+		padding: clamp(16px, 3vw, 36px);
 		box-sizing: border-box;
+		display: grid;
+		grid-template-columns: minmax(280px, 460px) minmax(260px, 1fr);
+		gap: clamp(18px, 4vw, 52px);
+		align-items: start;
+		font-size: 16px;
 
 		.user-info {
-			padding: 24px 16px;
-			background-color: #292b3c;
-			width: 352px;
+			width: 100%;
 			box-sizing: border-box;
-			border-radius: 3px;
+			padding: clamp(24px, 4vw, 40px);
+			background: linear-gradient(145deg, var(--surface-raised), var(--bg-secondary));
+			border: 1px solid var(--border-color);
+			border-radius: 32px;
+			box-shadow: var(--shadow-card);
 
 			.el-input,
 			.el-button {
-				width: 320px;
+				width: 100%;
 			}
 
 			.item {
-				display: flex;
-				margin-bottom: 16px;
+				display: grid;
+				grid-template-columns: 82px 1fr;
+				gap: 16px;
+				align-items: center;
+				margin-bottom: 18px;
+				padding-bottom: 18px;
+				border-bottom: 1px solid var(--border-color);
 
 				.label {
-					width: 70px;
-					text-align: justify;
-					margin-right: 16px;
-					color: #909bd4;
+					color: var(--text-muted);
+					font-size: 13px;
+					font-weight: 900;
+					letter-spacing: .12em;
 				}
 
-				.label::after {
-					display: inline-block;
-					width: 100%;
-					content: "";
-				}
-			}
-		}
-
-		.setting-box {
-
-			.setting-box-box {
-				padding: 16px;
-				width: 320px;
-				margin-bottom: 32px;
-				background-color: #292b3c;
-
-				.setting-box-item {
-					width: 320px;
-					display: flex;
-					align-items: center;
-					margin-bottom: 16px;
-
-					.el-button {
-						width: 320px;
-					}
-
-					:deep(.el-input__inner) {
-						width: 224px;
-					}
-
-					.label {
-						margin-right: 16px;
-						text-align: right;
-						min-width: 80px;
-						color: #909bd4;
-					}
-				}
-
-				.setting-box-item:last-child {
-					margin-bottom: 0px;
-				}
-
-				.setting-tip {
-					color: #aaa;
-					font-size: 12px;
-
-					.tip-selected {
-						color: #fff;
-						font-size: 14px;
-						line-height: 20px;
-					}
+				.value {
+					color: var(--text-primary);
+					font-size: 18px;
+					font-weight: 900;
+					word-break: break-all;
 				}
 			}
 
-			.setting-box-box:last-child {
-				margin-bottom: 0px;
+			:deep(.el-input__inner) {
+				height: 48px;
+			}
+
+			.el-button {
+				height: 46px;
+				margin-top: 4px;
 			}
 		}
 
 		.setting-bottom {
-			position: absolute;
-			bottom: 16px;
-			left: 0;
-			right: 0;
+			position: relative;
+			align-self: stretch;
 			display: flex;
-			align-items: center;
-			justify-content: center;
+			flex-direction: column;
+			justify-content: flex-end;
+			gap: 14px;
+			min-height: 280px;
+			padding: clamp(22px, 4vw, 40px);
+			box-sizing: border-box;
+			border: 1px solid var(--border-color);
+			border-radius: 32px;
+			background:
+				radial-gradient(circle at 90% 18%, var(--brand-soft), transparent 17rem),
+				var(--surface-soft);
+			overflow: hidden;
 
-			.setting-bottom-item {
-				margin-right: 16px;
-				
-				a {
-					color: #409eff;
-				}
-				
-				a:hover {
-					color: #66b1ff;
-				}
+			&::before {
+				content: "SYSTEM";
+				position: absolute;
+				top: 22px;
+				left: 28px;
+				font-size: clamp(42px, 9vw, 112px);
+				font-weight: 900;
+				letter-spacing: -.08em;
+				line-height: .8;
+				color: var(--text-primary);
+				opacity: .06;
+				pointer-events: none;
 			}
 
-			.setting-bottom-item:last-child {
-				margin-right: 0;
+			.setting-bottom-item {
+				position: relative;
+				z-index: 1;
+				color: var(--text-secondary);
+				font-weight: 800;
+
+				a {
+					color: var(--link-color);
+					text-decoration: none;
+				}
+
+				a:hover {
+					color: var(--link-hover-color);
+					text-decoration: underline;
+				}
+			}
+		}
+	}
+
+	@media (max-width: 860px) {
+		.user {
+			grid-template-columns: 1fr;
+			gap: 16px;
+
+			.setting-bottom {
+				min-height: 190px;
+			}
+		}
+	}
+
+	@media (max-width: 480px) {
+		.user {
+			padding: 12px;
+
+			.user-info,
+			.setting-bottom {
+				border-radius: 24px;
+				padding: 20px;
+			}
+
+			.user-info .item {
+				grid-template-columns: 1fr;
+				gap: 6px;
 			}
 		}
 	}

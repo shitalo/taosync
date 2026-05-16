@@ -52,6 +52,13 @@ const routes = [{
 			meta: {
 				letfIndex: '/home'
 			}
+		},{
+			path: 'task/current',
+			component: () => import('@/views/page/home/taskCurrentDetail'),
+			name: '实时任务详情',
+			meta: {
+				letfIndex: '/home'
+			}
 		}]
 	},
 	{

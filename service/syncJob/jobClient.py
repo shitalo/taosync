@@ -1,9 +1,10 @@
 """
-@Author：dr34m
-@Date  ：2024/7/11 12:14 
+@Author: Dr34m
+@Date  : 2024/7/11 12:14
 """
 import itertools
 import json
+import datetime
 import logging
 import threading
 import time
@@ -13,174 +14,165 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
+from common.config import getConfig
 from common.LNG import G
 from mapper import jobMapper
-from service.alist import alistService
+from service.openlist import openlistService
 from service.syncJob import taskService
 
 
 class CopyItem:
+    STATUS_QUERY_FAST_INTERVAL = 2.0
+    STATUS_QUERY_SLOW_INTERVAL = 8.0
+    STATUS_QUERY_MAX_TRANSIENT_FAILS = 4
+    STATUS_LOST_RECHECK_TIMES = 3
+
     def __init__(self, srcPath, dstPath, fileName, fileSize, method, jobTask):
         self.jobTask = jobTask
-        self.alistClient = self.jobTask.alistClient
+        self.openlistClient = self.jobTask.openlistClient
         self.taskId = self.jobTask.taskId
         self.srcPath = srcPath
         self.dstPath = dstPath
         self.fileName = fileName
         self.fileSize = fileSize
         self.copyType = 0 if method < 2 else 2
-        self.alistTaskId = None
+        self.openlistTaskId = None
         self.status = 0
         self.progress = 0.0
         self.errMsg = None
         self.createTime = int(time.time())
         self.doingKey = None
+        self.statusQueryFailNum = 0
+        self.remoteStateConfirmed = False
 
     def doByThread(self):
-        doThread = threading.Thread(target=self.doIt)
-        doThread.start()
+        threading.Thread(target=self.doIt).start()
+
+    @staticmethod
+    def _get_query_intervals():
+        cfg = getConfig()['server']
+        fast_interval = max(1.0, float(cfg.get('status_query_fast_interval', CopyItem.STATUS_QUERY_FAST_INTERVAL)))
+        slow_interval = max(fast_interval, float(cfg.get('status_query_slow_interval', CopyItem.STATUS_QUERY_SLOW_INTERVAL)))
+        return fast_interval, slow_interval
 
     def doIt(self):
         try:
             if self.jobTask.breakFlag:
                 self.status = 4
             else:
-                self.alistTaskId = self.alistClient.copyFile(self.srcPath, self.dstPath, self.fileName)
+                self.openlistTaskId = self.openlistClient.copyFile(self.srcPath, self.dstPath, self.fileName)
         except Exception as e:
             self.errMsg = str(e)
             self.status = 7
         else:
-            if self.alistTaskId is None:
+            if self.openlistTaskId is None:
                 self.status = 2
             elif self.status != 4:
                 self.checkAndGetStatus()
         self.endIt()
 
     def checkAndGetStatus(self):
-        """
-        不断检查状态并更新
-        :return:
-        """
         while True:
             if self.jobTask.breakFlag:
                 self.status = 4
-                if self.alistTaskId is not None:
+                if self.openlistTaskId is not None:
                     try:
-                        self.alistClient.copyTaskCancel(self.alistTaskId)
-                        self.alistClient.copyTaskDelete(self.alistTaskId)
+                        self.openlistClient.copyTaskCancel(self.openlistTaskId)
+                        self.openlistClient.copyTaskDelete(self.openlistTaskId)
                     except Exception as e:
                         self.status = 7
                         self.errMsg = str(e)
                 break
             cuTime = time.time()
-            time.sleep(0.61 if cuTime - self.jobTask.lastWatching < 3 else 2.93)
+            fast_interval, slow_interval = self._get_query_intervals()
+            time.sleep(fast_interval if cuTime - self.jobTask.lastWatching < 3 else slow_interval)
             try:
-                taskInfo = self.alistClient.taskInfo(self.alistTaskId)
+                taskInfo = self.openlistClient.taskInfoCached(self.openlistTaskId)
+                if taskInfo is None:
+                    taskInfo = self.openlistClient.taskInfo(self.openlistTaskId)
+                self.statusQueryFailNum = 0
+                self.remoteStateConfirmed = True
             except Exception as e:
                 logger = logging.getLogger()
                 logger.exception(e)
                 eMsg = str(e)
                 if '404' in eMsg:
-                    eMsg = (G('task_may_delete'))
-                taskInfo = {
-                    'state': 7,
-                    'progress': None,
-                    'error': eMsg
-                }
+                    taskInfo = self.confirmRemoteTaskState(G('task_may_delete'))
+                    if taskInfo is None:
+                        continue
+                else:
+                    self.statusQueryFailNum += 1
+                    self.errMsg = eMsg
+                    if self.statusQueryFailNum < self.STATUS_QUERY_MAX_TRANSIENT_FAILS:
+                        continue
+                    taskInfo = self.confirmRemoteTaskState(eMsg)
+                    if taskInfo is None:
+                        continue
             if taskInfo['state'] == self.status and taskInfo['progress'] == self.progress:
                 continue
             self.status = taskInfo['state']
             self.progress = taskInfo['progress']
             self.errMsg = taskInfo['error'] if taskInfo['error'] else None
-            # 删除结束的任务
             if taskInfo['state'] in [2, 4, 7]:
-                try:
-                    self.alistClient.copyTaskDelete(self.alistTaskId)
-                    break
-                except Exception:
-                    break
+                if self.remoteStateConfirmed:
+                    try:
+                        self.openlistClient.copyTaskDelete(self.openlistTaskId)
+                        break
+                    except Exception:
+                        break
+                break
+
+    def confirmRemoteTaskState(self, errMsg):
+        taskInfo = None
+        for _ in range(self.STATUS_LOST_RECHECK_TIMES):
+            try:
+                taskInfo = self.openlistClient.taskInfoByLists(self.openlistTaskId)
+            except Exception:
+                taskInfo = None
+            if taskInfo is not None:
+                self.remoteStateConfirmed = True
+                self.statusQueryFailNum = 0
+                return taskInfo
+            time.sleep(1.0)
+        self.remoteStateConfirmed = False
+        self.status = 12
+        self.errMsg = errMsg
+        return None
 
     def endIt(self):
         if self.copyType == 2 and self.status == 2:
             try:
-                self.alistClient.deleteFile(self.srcPath, [self.fileName], self.jobTask.job['scanIntervalS'])
+                self.openlistClient.deleteFile(self.srcPath, [self.fileName], self.jobTask.job['scanIntervalS'])
             except Exception as e:
                 self.status = 7
                 self.errMsg = G('copy_success_but_delete_fail').format(str(e))
-        self.jobTask.copyHook(self.srcPath, self.dstPath, self.fileName, self.fileSize, self.alistTaskId, self.status,
+        self.jobTask.copyHook(self.srcPath, self.dstPath, self.fileName, self.fileSize, self.openlistTaskId, self.status,
                               errMsg=self.errMsg, copyType=self.copyType, createTime=self.createTime)
         del self.jobTask.doing[self.doingKey]
 
 
 class JobTask:
     def __init__(self, taskId, vm):
-        """
-        作业任务类
-        :param taskId: 任务id
-        :param vm: 作业上下文
-        """
         self.taskId = taskId
         self.jobClient = vm
         self.job = self.jobClient.job
-        self.alistClient = alistService.getClientById(self.job['alistId'])
+        self.openlistClient = openlistService.getClientById(self.job['openlistId'])
         self.createTime = time.time()
-        # 已完成（包含成功或者失败）
         self.finish = []
-        # 已经提交到alist的任务
         self.doing = {}
-        # 等待提交到alist的任务
         self.waiting = []
-        # 上次查看详情的时间戳，低于3秒表示正在看，在看则快速检查状态，否则低速检查以节约开销
         self.lastWatching = 0.0
-        # 队列序号，用作复制任务的doingKey
         self.queueNum = 0
-        # sync全部任务加入队列标识
         self.scanFinish = False
-        # 首个文件开始同步时间
         self.firstSync = None
-        # 手动中止标识
         self.breakFlag = False
-        syncThread = threading.Thread(target=self.sync)
-        syncThread.start()
+        self.scanBackoff = {}
+        self.scanBackoffSkipStats = {}
+        threading.Thread(target=self.sync).start()
         self.currentTasks = {}
-        submitThread = threading.Thread(target=self.taskSubmit)
-        submitThread.start()
+        threading.Thread(target=self.taskSubmit).start()
 
     def getCurrent(self):
-        """
-        总结并返回详情（高实时性）
-        :return: {
-            'scanFinish': True,
-            'doingTask': [{
-                'srcPath': 来源目录,
-                'dstPath': 目标目录,
-                'fileName': 文件名,
-                'fileSize': 文件大小,
-                'status': 状态,
-                'type': 方式，0-复制（对于目录则是创建），1-删除，2-移动,
-                'progress': 进度,
-                'errMsg': 错误信息,
-                'createTime': 创建时间
-            }],
-            'createTime': int(self.createTime),
-            'duration': int(self.lastWatching - self.createTime),
-            'firstSync': int(self.firstSync) if self.firstSync is not None else None,
-            'num': {
-                'wait': 0,
-                'running': 1,
-                'success': 2,
-                'fail': 7,
-                'other': 0
-            },
-            'size': {
-                'wait': 0,
-                'running': 1,
-                'success': 2,
-                'fail': 7,
-                'other': 0
-            }
-        }
-        """
         self.lastWatching = time.time()
         waits = [{
             'srcPath': waitItem.srcPath,
@@ -207,19 +199,10 @@ class JobTask:
             'createTime': doItem.createTime
         } for doItem in self.doing.values()]
         allTask = list(itertools.chain(waits, dos, self.finish))
-        keyValSpace = {
-            'wait': 0,
-            'running': 1,
-            'success': 2,
-            'fail': 7,
-            'other': -1
-        }
-        currentTasks = {}
-        for val in keyValSpace.values():
-            currentTasks[val] = []
-        # 其他类型数组
+        keyValSpace = {'wait': 0, 'running': 1, 'success': 2, 'fail': 7, 'other': -1}
+        currentTasks = {val: [] for val in keyValSpace.values()}
         otk = []
-        otkStatus = [3, 4, 5, 6, 8, 9]
+        otkStatus = [3, 4, 5, 6, 8, 9, 10, 11, 12]
         grouped = defaultdict(list)
         for taskItem in allTask:
             grouped[taskItem['status']].append(taskItem)
@@ -242,18 +225,94 @@ class JobTask:
         }
         for key, val in keyValSpace.items():
             result['num'][key] = len(currentTasks[val])
-            result['size'][key] = sum(
-                item['fileSize'] for item in currentTasks[val] if item['fileSize'] is not None and item['type'] != 1)
+            result['size'][key] = sum(item['fileSize'] for item in currentTasks[val]
+                                      if item['fileSize'] is not None and item['type'] != 1)
         return result
+
+    def _scan_backoff_key(self, path, isSrc):
+        return ('src' if isSrc else 'dst', path)
+
+    def _get_scan_backoff_cfg(self):
+        cfg = getConfig()['server']
+        base_seconds = max(5, int(cfg.get('scan_retry_backoff_base', 60)))
+        max_seconds = max(base_seconds, int(cfg.get('scan_retry_backoff_max', 1800)))
+        return base_seconds, max_seconds
+
+    def _check_scan_backoff(self, path, isSrc):
+        item = self.scanBackoff.get(self._scan_backoff_key(path, isSrc))
+        if item is None:
+            return None
+        now = time.time()
+        if now >= item['until']:
+            del self.scanBackoff[self._scan_backoff_key(path, isSrc)]
+            return None
+        remain = int(item['until'] - now)
+        return f"scan backoff active, retry after {remain}s"
+
+    def _log_scan_backoff_skip(self, path, rootPath, isSrc, useCache, scanInterval, backoff_msg):
+        logger = logging.getLogger()
+        key = self._scan_backoff_key(path, isSrc)
+        stat = self.scanBackoffSkipStats.get(key)
+        if stat is None:
+            stat = {'count': 0, 'path': path, 'rootPath': rootPath, 'isSrc': isSrc,
+                    'totalBackoffSeconds': 0, 'maxFailCount': 0}
+            self.scanBackoffSkipStats[key] = stat
+        stat['count'] += 1
+        backoff_state = self.scanBackoff.get(key)
+        if backoff_state is not None:
+            stat['totalBackoffSeconds'] += int(backoff_state.get('last_backoff_seconds', 0))
+            stat['maxFailCount'] = max(stat['maxFailCount'], int(backoff_state.get('count', 0)))
+        logger.warning(
+            "Scan skipped by backoff | job_id=%s task_id=%s openlist_id=%s is_src=%s path=%s root_path=%s use_cache=%s scan_interval=%s reason=%s",
+            self.jobClient.jobId,
+            self.taskId,
+            self.job.get('openlistId'),
+            isSrc,
+            path,
+            rootPath,
+            useCache,
+            scanInterval,
+            backoff_msg
+        )
+
+    def _emit_scan_backoff_summary(self):
+        if not self.scanBackoffSkipStats:
+            return
+        logger = logging.getLogger()
+        for stat in self.scanBackoffSkipStats.values():
+            logger.warning(
+                "Scan backoff summary | job_id=%s task_id=%s is_src=%s path=%s root_path=%s skip_count=%s total_backoff_seconds=%s max_fail_count=%s",
+                self.jobClient.jobId,
+                self.taskId,
+                stat['isSrc'],
+                stat['path'],
+                stat['rootPath'],
+                stat['count'],
+                stat['totalBackoffSeconds'],
+                stat['maxFailCount']
+            )
+        self.scanBackoffSkipStats = {}
+
+    def _record_scan_backoff(self, path, isSrc):
+        key = self._scan_backoff_key(path, isSrc)
+        base_seconds, max_seconds = self._get_scan_backoff_cfg()
+        old = self.scanBackoff.get(key)
+        fail_count = 1 if old is None else old['count'] + 1
+        backoff_seconds = min(max_seconds, base_seconds * (2 ** (fail_count - 1)))
+        self.scanBackoff[key] = {'count': fail_count, 'until': time.time() + backoff_seconds,
+                                 'last_backoff_seconds': backoff_seconds}
+        return backoff_seconds, fail_count
+
+    def _clear_scan_backoff(self, path, isSrc):
+        key = self._scan_backoff_key(path, isSrc)
+        if key in self.scanBackoff:
+            del self.scanBackoff[key]
 
     def getCurrentByStatus(self, status):
         return self.currentTasks[status]
 
     def taskSubmit(self):
-        """
-        队列检验与提交
-        :return:
-        """
+        copy_parallel = min(20, max(1, int(getConfig()['server'].get('copy_parallel', 8))))
         while True:
             if self.breakFlag:
                 break
@@ -261,20 +320,19 @@ class JobTask:
             doingNums = len(self.doing.keys())
             waitingNums = len(self.waiting)
             if not self.scanFinish or doingNums != 0 or waitingNums != 0:
-                while doingNums < 20:
+                while doingNums < copy_parallel:
                     if self.breakFlag:
                         break
                     if waitingNums == 0:
                         break
-                    else:
-                        if self.firstSync is None:
-                            self.firstSync = time.time()
-                        self.queueNum += 1
-                        self.doing[self.queueNum] = self.waiting.pop(0)
-                        self.doing[self.queueNum].doingKey = self.queueNum
-                        self.doing[self.queueNum].doByThread()
-                        doingNums = len(self.doing.keys())
-                        waitingNums = len(self.waiting)
+                    if self.firstSync is None:
+                        self.firstSync = time.time()
+                    self.queueNum += 1
+                    self.doing[self.queueNum] = self.waiting.pop(0)
+                    self.doing[self.queueNum].doingKey = self.queueNum
+                    self.doing[self.queueNum].doByThread()
+                    doingNums = len(self.doing.keys())
+                    waitingNums = len(self.waiting)
             else:
                 break
         tryTime = 0
@@ -283,27 +341,14 @@ class JobTask:
             time.sleep(.5)
             if tryTime > 3:
                 break
+        self._emit_scan_backoff_summary()
         jobMapper.addJobTaskItemMany(self.finish)
         self.updateTaskStatus()
         self.jobClient.jobDoing = False
         self.jobClient.currentJobTask = None
 
-    def copyHook(self, srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0,
+    def copyHook(self, srcPath, dstPath, name, size, openlistTaskId=None, status=0, errMsg=None, isPath=0,
                  copyType=0, createTime=int(time.time())):
-        """
-        复制文件回调
-        :param srcPath: 来源目录
-        :param dstPath: 目标目录
-        :param name: 文件名
-        :param size: 文件大小
-        :param alistTaskId: alist任务id
-        :param status: 0-等待中，1-运行中，2-成功，3-取消中，4-已取消，5-出错（将重试），6-失败中，
-                        7-已失败，8-等待重试中，9-等待重试回调执行中，10-目录扫描失败，11-目录创建失败
-        :param errMsg: 错误信息
-        :param isPath: 是否是目录，0-文件，1-目录
-        :param copyType: 0-复制，2-移动
-        :param createTime:
-        """
         self.finish.append({
             'taskId': self.taskId,
             'srcPath': srcPath,
@@ -312,23 +357,13 @@ class JobTask:
             'fileName': name,
             'fileSize': size,
             'type': copyType,
-            'alistTaskId': alistTaskId,
+            'openlistTaskId': openlistTaskId,
             'status': status,
             'errMsg': errMsg,
             'createTime': createTime
         })
 
     def delHook(self, dstPath, name, size, status=2, errMsg=None, isPath=0, createTime=int(time.time())):
-        """
-        删除文件回调
-        :param dstPath: 目标目录
-        :param name: 文件名
-        :param size: 文件大小
-        :param status: 2-成功、7-失败
-        :param errMsg: 错误信息
-        :param isPath: 是否是目录，0-文件，1-目录
-        :param createTime: 创建时间
-        """
         self.finish.append({
             'taskId': self.taskId,
             'srcPath': None,
@@ -337,16 +372,13 @@ class JobTask:
             'fileName': name,
             'fileSize': size,
             'type': 1,
-            'alistTaskId': None,
+            'openlistTaskId': None,
             'status': status,
             'errMsg': errMsg,
             'createTime': createTime
         })
 
     def sync(self):
-        """
-        同步方法
-        """
         srcPath = self.job['srcPath']
         jobExclude = self.job['exclude']
         spec = None
@@ -355,40 +387,16 @@ class JobTask:
         if not srcPath.endswith('/'):
             srcPath = srcPath + '/'
         dstPathList = self.job['dstPath'].split(':')
-        i = 0
-        for dstItem in dstPathList:
-            i += 1
+        for i, dstItem in enumerate(dstPathList, start=1):
             self.syncWithHave(srcPath, dstItem, spec, srcPath, dstItem, i == 1)
         self.scanFinish = True
 
     def copyFile(self, srcPath, dstPath, fileName, fileSize):
-        """
-        复制文件
-        vm.job['method']: 0-仅新增，1-全同步，2-移动模式
-        vm.job['copyHook']: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0）
-        vm.job['delHook']: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None, isPath=0）
-        :param srcPath: 源目录
-        :param dstPath: 目标目录
-        :param fileName: 文件名
-        :param fileSize: 文件大小
-        :return:
-        """
         if self.breakFlag:
             return
-        copyItem = CopyItem(srcPath, dstPath, fileName, fileSize, self.job['method'], self)
-        self.waiting.append(copyItem)
+        self.waiting.append(CopyItem(srcPath, dstPath, fileName, fileSize, self.job['method'], self))
 
     def delFile(self, path, fileName, size):
-        """
-        删除文件（或目录）
-        self.job['method']: 0-仅新增，1-全同步，2-移动模式
-        self.copyHook: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0, createTime）
-        self.delHook: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None, isPath=0, createTime）
-        :param path: 所在路径
-        :param fileName: 文件名（或目录名）
-        :param size: 大小（文件）或空对象（目录）
-        :return:
-        """
         if self.breakFlag:
             return
         isPath = fileName.endswith('/')
@@ -396,107 +404,88 @@ class JobTask:
         errMsg = None
         createTime = int(time.time())
         try:
-            self.alistClient.deleteFile(path, [fileName if not isPath else fileName[:-1]], self.job['scanIntervalT'])
+            self.openlistClient.deleteFile(path, [fileName if not isPath else fileName[:-1]], self.job['scanIntervalT'])
         except Exception as e:
             status = 7
             errMsg = str(e)
         self.delHook(path, fileName, None if isPath else size, status, errMsg, isPath, createTime)
 
     def listDir(self, path, firstDst, spec, rootPath, isSrc=True):
-        """
-        列出目录
-        self.job['useCacheT']: 扫描目标目录时，是否使用缓存，0-不使用，1-使用
-        self.job['scanIntervalT']: 目标目录扫描间隔，单位秒
-        self.job['useCacheS']: 扫描源目录时，是否使用缓存，0-不使用，1-使用
-        self.job['scanIntervalS']: 源目录扫描间隔，单位秒
-        :param path:
-        :param firstDst: 是否是第一个目标目录（如果是，将完整扫描源目录，否则使用缓存扫描源目录）
-        :param spec:
-        :param rootPath:
-        :param isSrc:
-        :return:
-        """
         useCache = 1 if isSrc and not firstDst else self.job[f"useCache{'S' if isSrc else 'T'}"]
         scanInterval = self.job[f"scanInterval{'S' if isSrc else 'T'}"]
+        backoff_msg = self._check_scan_backoff(path, isSrc)
+        if backoff_msg is not None:
+            self._log_scan_backoff_skip(path, rootPath, isSrc, useCache, scanInterval, backoff_msg)
+            return {}
         try:
-            return self.alistClient.fileListApi(path, useCache, scanInterval, spec, rootPath)
+            result = self.openlistClient.fileListApi(path, useCache, scanInterval, spec, rootPath)
+            self._clear_scan_backoff(path, isSrc)
+            return result
         except Exception as e:
             logger = logging.getLogger()
             errMsg = G('scan_error').format(G('src' if isSrc else 'dst'), str(e))
-            logger.error(errMsg)
+            backoff_seconds = None
+            backoff_count = None
+            if 'timed out' in str(e).lower() or 'scan backoff active' in str(e).lower():
+                if 'scan backoff active' not in str(e).lower():
+                    backoff_seconds, backoff_count = self._record_scan_backoff(path, isSrc)
+            logger.error(
+                "%s | job_id=%s task_id=%s openlist_id=%s is_src=%s path=%s root_path=%s use_cache=%s scan_interval=%s backoff_seconds=%s backoff_count=%s",
+                errMsg,
+                self.jobClient.jobId,
+                self.taskId,
+                self.job.get('openlistId'),
+                isSrc,
+                path,
+                rootPath,
+                useCache,
+                scanInterval,
+                backoff_seconds,
+                backoff_count
+            )
             logger.exception(e)
             self.copyHook(path if isSrc else None, None if isSrc else path, None, None, status=7, errMsg=errMsg,
                           isPath=1)
             raise e
 
     def syncWithHave(self, srcPath, dstPath, spec, srcRootPath, dstRootPath, firstDst):
-        """
-        扫描并同步-目标目录存在目录（意味着要继续扫描目标目录）
-        :param srcPath: 来源路径，以/结尾
-        :param dstPath: 目标路径，以/结尾
-        :param spec: 排除项规则
-        :param srcRootPath: 来源目录根目录，以/结尾
-        :param dstRootPath: 目标目录根目录，以/结尾
-        :param firstDst: 是否是第一个目标目录（如果是，将完整扫描源目录，否则使用缓存扫描源目录）
-        :return:
-        """
         if self.breakFlag:
             return
         try:
             srcFiles = self.listDir(srcPath, firstDst, spec, srcRootPath)
             dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False)
         except Exception:
-            # 已在listDir做出日志打印等操作，此处啥都不用做
             return
         for key in srcFiles.keys():
-            # 如果是文件
             if not key.endswith('/'):
-                # 目标目录没有这个文件或文件大小不匹配(即需要同步)
                 if key not in dstFiles or dstFiles[key] != srcFiles[key]:
                     self.copyFile(srcPath, dstPath, key, srcFiles[key])
-            # 如果是目录
             else:
-                # 目标目录没有这个目录
                 if key not in dstFiles:
-                    self.syncWithOutHave(srcPath + key, dstPath + key, spec, srcRootPath, dstRootPath,
-                                         firstDst)
-                # 目标目录有这个目录，继续递归
+                    self.syncWithOutHave(srcPath + key, dstPath + key, spec, srcRootPath, dstRootPath, firstDst)
                 else:
-                    self.syncWithHave(srcPath + key, dstPath + key, spec, srcRootPath, dstRootPath,
-                                      firstDst)
+                    self.syncWithHave(srcPath + key, dstPath + key, spec, srcRootPath, dstRootPath, firstDst)
         if self.job['method'] == 1:
             for dstKey in dstFiles.keys():
                 if dstKey not in srcFiles:
                     self.delFile(dstPath, dstKey, dstFiles[dstKey])
 
     def syncWithOutHave(self, srcPath, dstPath, spec, srcRootPath, dstRootPath, firstDst):
-        """
-        扫描并同步-目标目录为空
-        :param srcPath: 来源路径，以/结尾
-        :param dstPath: 目标路径，以/结尾
-        :param spec:
-        :param srcRootPath:
-        :param dstRootPath:
-        :param firstDst:
-        :return:
-        """
         if self.breakFlag:
             return
         status = 2
         errMsg = None
         try:
-            self.alistClient.mkdir(dstPath, self.job['scanIntervalT'])
+            self.openlistClient.mkdir(dstPath, self.job['scanIntervalT'])
         except Exception as e:
             status = 7
             errMsg = str(e)
-        # 目录回调
         self.copyHook(srcPath, dstPath, None, None, status=status, errMsg=errMsg, isPath=1)
         if status != 2:
             return
         try:
             srcFiles = self.listDir(srcPath, firstDst, spec, srcRootPath)
         except Exception:
-            # 已在listDir做出日志打印等操作，此处啥都不用做
             return
         for key in srcFiles.keys():
             if self.breakFlag:
@@ -507,9 +496,6 @@ class JobTask:
                 self.copyFile(srcPath, dstPath, key, srcFiles[key])
 
     def updateTaskStatus(self):
-        """
-        所有任务完成后，最终更新任务状态
-        """
         self.getCurrent()
         failOrOtherNum = len(self.currentTasks[7]) + len(self.currentTasks[-1])
         status = 7 if self.breakFlag else 2 if failOrOtherNum == 0 else 3
@@ -518,10 +504,6 @@ class JobTask:
 
 class JobClient:
     def __init__(self, job, isInit=False):
-        """
-        初始化job
-        :param job: {id(新增时不需要), enable, srcPath, dstPath, alistId, useCacheT, scanIntervalT, useCacheS, scanIntervalS, method, interval, exclude, cron相关}
-        """
         addJobId = 0
         if 'enable' not in job:
             job['enable'] = 1
@@ -534,36 +516,20 @@ class JobClient:
         self.job = job
         self.scheduled = None
         self.scheduledJob = None
+        self.timeWindowRunning = False
+        self.timeWindowStarted = False
         self.jobDoing = False
-        # 正在执行中的作业信息；仅在内存中，不入库，高速读写；执行完毕后批量入库，如果遇到异常终止，不会补偿入库
-        # 单项结构 {
-        #   'taskId':   所属任务id
-        #   'alistTaskId': alist任务id
-        #   'srcPath':  来源路径
-        #   'dstPath':  目标路径
-        #   'fileName': 文件名或者文件目录名
-        #   'fileSize': 文件大小
-        #   'status':   状态 0-等待中，1-运行中，2-成功，3-取消中，4-已取消，5-出错（将重试），
-        #               6-失败中，7-已失败，8-等待重试中，9-等待重试回调执行中
-        #   'progress': 进度
-        #   'errMsg':   失败原因
-        # }
         self.currentJobTask = None
         try:
             self.doByTime()
         except Exception as e:
             if isInit or addJobId != 0:
-                # 仅在初始化和新增任务时删除错误的任务
                 logger = logging.getLogger()
                 logger.error(G('del_job_course_error').format(json.dumps(self.job)))
                 jobMapper.deleteJob(self.jobId)
             raise e
 
     def doJob(self):
-        """
-        执行作业
-        :return:
-        """
         while self.jobDoing:
             if self.job['enable'] == 0:
                 return
@@ -588,20 +554,113 @@ class JobClient:
             logger.exception(e)
 
     def doManual(self):
-        """
-        手动执行作业
-        :return:
-        """
         if self.jobDoing:
             raise Exception(G('job_running'))
-        doJobThread = threading.Thread(target=self.doJob)
-        doJobThread.start()
+        threading.Thread(target=self.doJob).start()
+
+    def getTimeWindowConfig(self):
+        raw_config = self.job.get('timeWindow')
+        if raw_config is None or str(raw_config).strip() == '':
+            return None
+        if isinstance(raw_config, dict):
+            return raw_config
+        try:
+            return json.loads(raw_config)
+        except Exception as e:
+            raise Exception(f"timeWindow配置错误: {str(e)}")
+
+    def parseWindowMinute(self, value, field_name):
+        if value is None or str(value).strip() == '':
+            raise Exception(f"时间窗{field_name}不能为空")
+        value = str(value).strip()
+        if ':' not in value:
+            raise Exception(f"时间窗{field_name}格式应为HH:mm")
+        hour, minute = value.split(':', 1)
+        hour = int(hour)
+        minute = int(minute)
+        if hour < 0 or hour > 24 or minute < 0 or minute > 59:
+            raise Exception(f"时间窗{field_name}超出范围")
+        if hour == 24 and minute != 0:
+            raise Exception(f"时间窗{field_name}的24点时分必须为0")
+        return hour * 60 + minute
+
+    def getSelectedWindowDays(self, config):
+        mode = config.get('mode', 'daily')
+        if mode == 'daily':
+            return set(range(7))
+        days = config.get('days', [])
+        if mode == 'day':
+            days = config.get('daysOfMonth', days)
+        selected = set()
+        for item in days:
+            try:
+                selected.add(int(item))
+            except Exception:
+                continue
+        return selected
+
+    def windowDayMatches(self, config, dt):
+        mode = config.get('mode', 'daily')
+        if mode == 'daily':
+            return True
+        selected = self.getSelectedWindowDays(config)
+        if mode == 'week':
+            return dt.weekday() in selected
+        if mode == 'day':
+            return dt.day in selected
+        return False
+
+    def timeWindowActive(self, dt=None):
+        config = self.getTimeWindowConfig()
+        if config is None:
+            raise Exception('timeWindow配置不能为空')
+        windows = config.get('ranges', [])
+        if not windows:
+            raise Exception('时间窗至少需要一个时间段')
+        if dt is None:
+            dt = datetime.datetime.now()
+        minute_of_day = dt.hour * 60 + dt.minute
+        previous_day = dt - datetime.timedelta(days=1)
+        for item in windows:
+            start = self.parseWindowMinute(item.get('start'), '开始时间')
+            end = self.parseWindowMinute(item.get('end'), '结束时间')
+            if start == end:
+                continue
+            if start < end:
+                if self.windowDayMatches(config, dt) and start <= minute_of_day < end:
+                    return True
+            else:
+                if self.windowDayMatches(config, dt) and start <= minute_of_day < 24 * 60:
+                    return True
+                if self.windowDayMatches(config, previous_day) and 0 <= minute_of_day < end:
+                    return True
+        return False
+
+    def doTimeWindowCheck(self):
+        if self.job['enable'] == 0:
+            if self.currentJobTask:
+                self.currentJobTask.breakFlag = True
+            self.timeWindowRunning = False
+            self.timeWindowStarted = False
+            return
+        active = self.timeWindowActive()
+        if active:
+            self.timeWindowRunning = True
+            if not self.timeWindowStarted:
+                self.timeWindowStarted = True
+                if not self.jobDoing:
+                    self.doManual()
+        else:
+            self.timeWindowRunning = False
+            self.timeWindowStarted = False
+            if self.currentJobTask:
+                self.currentJobTask.breakFlag = True
 
     def doByTime(self):
         params = {
             'func': self.doJob,
             'misfire_grace_time': 15 * 60,
-            'trigger': 'interval' if self.job['isCron'] == 0 else 'cron'
+            'trigger': 'interval' if self.job['isCron'] in [0, 3] else 'cron'
         }
         if self.job['isCron'] == 0:
             interval = self.job['interval']
@@ -618,6 +677,11 @@ class JobClient:
                     params[item] = self.job[item]
             if flag == 0:
                 raise Exception(G('cron_lost'))
+        elif self.job['isCron'] == 3:
+            self.timeWindowActive()
+            params['func'] = self.doTimeWindowCheck
+            params['minutes'] = 1
+            params['next_run_time'] = datetime.datetime.now()
         else:
             return
         self.scheduled = BackgroundScheduler()
@@ -627,31 +691,17 @@ class JobClient:
             self.scheduledJob.pause()
 
     def resumeJob(self):
-        """
-        恢复作业
-        :return:
-        """
         if self.scheduledJob is None:
             raise Exception(G('cannot_resume_lost_job'))
-        else:
-            jobMapper.updateJobEnable(self.jobId, 1)
-            self.job['enable'] = 1
-            self.scheduledJob.resume()
+        jobMapper.updateJobEnable(self.jobId, 1)
+        self.job['enable'] = 1
+        self.scheduledJob.resume()
 
     def abortJob(self):
-        """
-        中止作业
-        :return:
-        """
         if self.currentJobTask:
             self.currentJobTask.breakFlag = True
 
     def stopJob(self, remove=False):
-        """
-        停止作业（适用于修改enable）
-        :param remove: 是否删除作业，否一般用于禁用作业
-        :return:
-        """
         self.job['enable'] = 0
         if self.currentJobTask:
             self.currentJobTask.breakFlag = True

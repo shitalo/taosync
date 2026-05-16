@@ -46,6 +46,12 @@ def handle_request(func):
         except Exception as e:
             msg = commonService.result_map(str(e), 500)
             logger = logging.getLogger()
+            logger.error(
+                "Request failed | uri=%s method=%s body=%s",
+                self.request.uri,
+                self.request.method,
+                commonService.dump_for_log(commonService.get_post_data(self), 1200)
+            )
             logger.exception(e)
         self.write(msg)
 

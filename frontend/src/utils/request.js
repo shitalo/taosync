@@ -2,8 +2,7 @@ import axios from 'axios';
 import {
 	Notification,
 	MessageBox,
-	Message,
-	Loading
+	Message
 } from 'element-ui';
 import {
 	tansParams
@@ -11,7 +10,7 @@ import {
 import errorCode from '@/utils/errorCode';
 import store from '@/store';
 import Cookies from 'js-cookie';
-let downloadLoadingInstance;
+
 // 是否显示重新登录
 export let isRelogin = {
 	show: false
@@ -20,6 +19,17 @@ export let isRelogin = {
 let timeout = 90000;
 
 axios.defaults.headers['Content-Type'] = 'application/json;charset=utf-8';
+
+const setRequestLoading = value => {
+	store.commit('$uStore', {
+		name: 'vuex_onRequest',
+		value
+	})
+	store.commit('$uStore', {
+		name: 'vuex_loading',
+		value
+	})
+};
 
 const service = axios.create({
 	// axios中请求配置有baseURL选项，表示请求URL公共部分
@@ -57,20 +67,12 @@ service.interceptors.request.use(config => {
 
 	return config;
 }, error => {
-	console.log(error);
-	Promise.reject(error);
+	return Promise.reject(error);
 })
 
 // 响应拦截器
 service.interceptors.response.use(res => {
-		store.commit('$uStore', {
-			name: 'vuex_onRequest',
-			value: false
-		})
-		store.commit('$uStore', {
-			name: 'vuex_loading',
-			value: false
-		})
+		setRequestLoading(false);
 		// 未设置状态码则默认成功状态
 		const code = res.data.code || 200;
 		// 获取错误信息
@@ -120,15 +122,7 @@ service.interceptors.response.use(res => {
 		}
 	},
 	error => {
-		store.commit('$uStore', {
-			name: 'vuex_onRequest',
-			value: false
-		})
-		store.commit('$uStore', {
-			name: 'vuex_loading',
-			value: false
-		})
-		console.log('err' + error);
+		setRequestLoading(false);
 		let {
 			message
 		} = error;
