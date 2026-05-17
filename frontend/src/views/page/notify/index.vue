@@ -15,7 +15,7 @@
 				:show="dataCount > 0"
 				title="渠道列表"
 				:summary="notifyToolbarSummary"
-				hint="按通知渠道聚合展示，常用操作在右侧"
+				hint="按通知渠道分组展示，常用操作在右侧"
 			/>
 
 			<div class="notify-grid" v-loading="loading && dataCount > 0">
@@ -356,16 +356,16 @@
 			channelSummary(item) {
 				const params = this.parseNotifyParams(item);
 				if (item.method === 0) {
-					return params.url ? `${params.method || 'POST'} 路 ${params.url}` : '自定义 Webhook，按你的接口格式发送';
+					return params.url ? `${params.method || 'POST'} · ${params.url}` : '自定义 Webhook，按你的接口格式发送';
 				}
 				if (item.method === 1) {
-					return params.sendKey ? `SendKey 路 ${String(params.sendKey).slice(0, 8)}...` : '通过 Server 酱推送到微信';
+					return params.sendKey ? `SendKey · ${String(params.sendKey).slice(0, 8)}...` : '通过 Server 酱推送到微信';
 				}
 				if (item.method === 2 || item.method === 4) {
 					return params.url ? params.url : `${this.channelMethodName(item.method)} WebHook 地址未展示`;
 				}
 				if (item.method === 3) {
-					return params.agentid ? `应用 ID 路 ${params.agentid}` : '企业微信应用消息';
+					return params.agentid ? `应用 ID · ${params.agentid}` : '企业微信应用消息';
 				}
 				return '通知渠道';
 			},

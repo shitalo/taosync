@@ -168,9 +168,11 @@ class JobTask:
         self.breakFlag = False
         self.scanBackoff = {}
         self.scanBackoffSkipStats = {}
-        threading.Thread(target=self.sync).start()
+        self.finalized = False
+        self.finalizeLock = threading.Lock()
+        threading.Thread(target=self._run_sync, name=f"job-sync-{taskId}", daemon=True).start()
         self.currentTasks = {}
-        threading.Thread(target=self.taskSubmit).start()
+        threading.Thread(target=self._run_task_submit, name=f"job-submit-{taskId}", daemon=True).start()
 
     def getCurrent(self):
         self.lastWatching = time.time()
@@ -341,11 +343,7 @@ class JobTask:
             time.sleep(.5)
             if tryTime > 3:
                 break
-        self._emit_scan_backoff_summary()
-        jobMapper.addJobTaskItemMany(self.finish)
-        self.updateTaskStatus()
-        self.jobClient.jobDoing = False
-        self.jobClient.currentJobTask = None
+        self.finalizeTask()
 
     def copyHook(self, srcPath, dstPath, name, size, openlistTaskId=None, status=0, errMsg=None, isPath=0,
                  copyType=0, createTime=int(time.time())):
@@ -390,6 +388,82 @@ class JobTask:
         for i, dstItem in enumerate(dstPathList, start=1):
             self.syncWithHave(srcPath, dstItem, spec, srcPath, dstItem, i == 1)
         self.scanFinish = True
+
+    def _run_sync(self):
+        try:
+            self.sync()
+        except Exception as e:
+            logger = logging.getLogger()
+            logger.error(
+                "Job scan crashed | job_id=%s task_id=%s src=%s dst=%s err=%s",
+                self.jobClient.jobId,
+                self.taskId,
+                self.job.get('srcPath'),
+                self.job.get('dstPath'),
+                str(e)
+            )
+            logger.exception(e)
+            self.copyHook(self.job.get('srcPath'), self.job.get('dstPath'), None, None, status=7, errMsg=str(e), isPath=1)
+            self.scanFinish = True
+
+    def _run_task_submit(self):
+        try:
+            self.taskSubmit()
+        except Exception as e:
+            logger = logging.getLogger()
+            logger.error(
+                "Job submit loop crashed | job_id=%s task_id=%s err=%s",
+                self.jobClient.jobId,
+                self.taskId,
+                str(e)
+            )
+            logger.exception(e)
+            self.finalizeTask(status=6, errMsg=str(e))
+
+    def finalizeTask(self, status=None, errMsg=None):
+        with self.finalizeLock:
+            if self.finalized:
+                return
+            self.finalized = True
+        try:
+            self._emit_scan_backoff_summary()
+            if self.finish:
+                jobMapper.addJobTaskItemMany(self.finish)
+            if status is None:
+                self.updateTaskStatus()
+            else:
+                self.getCurrent()
+                taskService.updateJobTaskStatus(
+                    self.taskId,
+                    status,
+                    errMsg,
+                    taskList=self.currentTasks,
+                    createTime=self.createTime
+                )
+        except Exception as finalize_error:
+            logger = logging.getLogger()
+            logger.error(
+                "Job finalize failed | job_id=%s task_id=%s status=%s err=%s",
+                self.jobClient.jobId,
+                self.taskId,
+                status,
+                str(finalize_error)
+            )
+            logger.exception(finalize_error)
+            try:
+                fallback_status = 6 if status is None else status
+                taskService.updateJobTaskStatus(self.taskId, fallback_status, str(finalize_error))
+            except Exception as fallback_error:
+                logger.error(
+                    "Job finalize fallback failed | job_id=%s task_id=%s err=%s",
+                    self.jobClient.jobId,
+                    self.taskId,
+                    str(fallback_error)
+                )
+                logger.exception(fallback_error)
+        finally:
+            self.jobClient.jobDoing = False
+            self.jobClient.currentJobTask = None
 
     def copyFile(self, srcPath, dstPath, fileName, fileSize):
         if self.breakFlag:

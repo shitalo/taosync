@@ -35,7 +35,7 @@
 					<div class="job-row-head">
 						<div class="job-title-group">
 							<h3>{{row.remark || `作业 #${row.id}`}}</h3>
-							<div class="job-card-subtitle">#{{row.id}} 路 {{callModeText(row)}} 路 {{scheduleText(row)}}</div>
+							<div class="job-card-subtitle">#{{row.id}} · {{callModeText(row)}} · {{scheduleText(row)}}</div>
 						</div>
 						<div class="job-row-badges">
 							<div :class="['job-status-pill', row.enable ? 'is-enabled' : 'is-disabled']">
@@ -126,7 +126,7 @@
 				return '当前页 ' + current + ' 个，共 ' + total + ' 个，启用 ' + this.enabledCount + ' 个，禁用 ' + this.disabledCount + ' 个';
 			},
 			toolbarHint() {
-				return this.runningJobCount > 0 ? this.runningJobCount + ' 个作业正在执行' : '按作业链路聚合展示，常用操作在右侧';
+				return this.runningJobCount > 0 ? this.runningJobCount + ' 个作业正在执行' : '按作业分组展示，常用操作在右侧';
 			}
 		},
 		props: {

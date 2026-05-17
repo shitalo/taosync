@@ -3,7 +3,7 @@
 		<ManagementHero
 			kicker="SYNC JOBS"
 			title="作业管理"
-			description="快速查看同步链路、执行状态与常用操作；列表优先展示更多作业，减少翻页和滚动成本。"
+			description="快速查看同步作业、执行状态与常用操作；列表优先展示更多作业，减少翻页和滚动成本。"
 			:statValue="jobData.count || jobData.dataList.length"
 			statLabel="总作业"
 			actionText="新建作业"

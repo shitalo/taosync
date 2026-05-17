@@ -20,7 +20,7 @@
 								</el-tooltip>
 							</template>
 						</div>
-						<div>当前状态：<span class="info-value">扫描{{current.scanFinish ? '完成，同步' : (current.firstSync === null ? '' : '并同步')}}中</span></div>
+						<div>当前状态：<span class="info-value">{{currentStatusText}}</span></div>
 						<div>平均速度：<span class="info-value" v-if="current.firstSync === null">--</span>
 							<span class="info-value" v-else>{{current.speedAvg | sizeFilter}}/s</span>
 							<el-tooltip v-if="current.firstSync !== null" effect="dark" placement="top-end" content="如果扫描用时太久，估算速度可能有很大误差">
@@ -120,6 +120,21 @@
 					dataList,
 					count
 				}
+			},
+			currentStatusText() {
+				if (this.current === null) {
+					return '--';
+				}
+				if (this.current.scanFinish && this.current.firstSync === null) {
+					return '扫描完成，未发现需同步内容';
+				}
+				if (this.current.scanFinish) {
+					return '扫描完成，同步中';
+				}
+				if (this.current.firstSync === null) {
+					return '扫描中';
+				}
+				return '扫描并同步中';
 			}
 		},
 		data() {
