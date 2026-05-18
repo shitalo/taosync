@@ -54,7 +54,9 @@
 				</div>
 			</div>
 			<div class="current-box-bottom">
-				<div class="content-none-data" v-if="current.firstSync === null">扫描中，暂无需要同步的文件，请耐心等待...</div>
+				<div class="current-empty-pane" v-if="current.firstSync === null">
+					<div class="content-none-data">扫描中，暂无需要同步的文件，请耐心等待...</div>
+				</div>
 				<taskCurrentEcharts v-else class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
 				<div class="current-box-task">
 					<div class="current-box-task-left">
@@ -494,12 +496,21 @@
 					border-right: 1px dotted var(--border-light);
 				}
 
-				.content-none-data {
+				.current-empty-pane {
 					width: 40%;
+					height: 100%;
+					min-height: 0;
 					box-sizing: border-box;
+					padding: 8px 12px 8px 0;
+					border-right: 1px dotted var(--border-light);
+					display: flex;
+				}
+
+				.current-empty-pane .content-none-data {
+					width: 100%;
 					min-height: 0;
 					height: 100%;
-					padding: 12px;
+					padding: 18px 20px;
 					border-radius: 18px;
 					font-size: 14px;
 					line-height: 1.6;
@@ -507,6 +518,7 @@
 					white-space: normal;
 					overflow-wrap: anywhere;
 					word-break: break-word;
+					box-sizing: border-box;
 				}
 
 				.current-box-task {
@@ -581,9 +593,13 @@
 				.current-box-bottom {
 					min-width: 920px;
 
-					.content-none-data {
+					.current-empty-pane {
 						width: 40%;
-						padding: 12px;
+						padding: 8px 12px 8px 0;
+					}
+
+					.current-empty-pane .content-none-data {
+						padding: 16px;
 						font-size: 13px;
 					}
 

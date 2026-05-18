@@ -74,7 +74,7 @@
 		<div class="page">
 			<el-pagination @size-change="handleSizeChange" @current-change="handleCurrentChange"
 				:current-page="params.pageNum" :page-size="params.pageSize" :total="taskItemData.count"
-				layout="total, sizes, prev, pager, next, jumper" :page-sizes="[10, 20, 50, 100]">
+				:layout="paginationLayout" :page-sizes="[10, 20, 50, 100]">
 			</el-pagination>
 		</div>
 	</div>
@@ -102,12 +102,27 @@
 					pageSize: 10,
 					pageNum: 1
 				},
-				expandedIndex: null
+				expandedIndex: null,
+				isMobile: false
 			};
 		},
+		computed: {
+			paginationLayout() {
+				return this.isMobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next, jumper';
+			}
+		},
 		created() {},
-		beforeDestroy() {},
+		mounted() {
+			this.checkMobile();
+			window.addEventListener('resize', this.checkMobile);
+		},
+		beforeDestroy() {
+			window.removeEventListener('resize', this.checkMobile);
+		},
 		methods: {
+			checkMobile() {
+				this.isMobile = window.innerWidth <= 768;
+			},
 			handleSizeChange(val) {
 				this.params.pageSize = val;
 				this.$emit("pageChange", this.params);
@@ -424,12 +439,11 @@
 			align-items: center;
 			min-height: 46px;
 			box-sizing: border-box;
-			overflow-x: auto;
-			overflow-y: hidden;
+			overflow: hidden;
 		}
 
 		.page ::v-deep .el-pagination {
-			white-space: nowrap;
+			white-space: normal;
 		}
 	}
 
@@ -488,19 +502,41 @@
 	// 移动端适配
 	@media (max-width: 768px) {
 		.taskDetailTable {
+			overflow-x: hidden;
+
 			.card-list-container {
 				padding-right: 0;
+				scrollbar-width: none;
+				-ms-overflow-style: none;
 			}
 
 			.page {
 				justify-content: center;
 				padding-bottom: 0;
+				scrollbar-width: none;
+				-ms-overflow-style: none;
 			}
 
 			.page ::v-deep .el-pagination {
 				display: flex;
-				flex-wrap: nowrap;
+				flex-wrap: wrap;
 				align-items: center;
+				justify-content: center;
+				row-gap: 8px;
+				width: 100%;
+				max-width: 100%;
+				min-width: 0;
+			}
+
+			.page ::v-deep .el-pagination > * {
+				min-width: 0;
+			}
+
+			.card-list-container::-webkit-scrollbar,
+			.page::-webkit-scrollbar {
+				width: 0;
+				height: 0;
+				display: none;
 			}
 
 			.card-item {

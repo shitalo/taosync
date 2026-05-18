@@ -1,22 +1,19 @@
 <template>
 	<div class="taskDetail">
 		<div class="top-box">
-			<div style="display: flex; align-items: center;">
-				<el-button class="tao-back-button" type="primary" icon="el-icon-back" @click="goback" size="small"
-					style="margin-right: 12px;">返回</el-button>
-				<el-select v-model="params.status" placeholder="筛选状态" @change="getTaskItemList" clearable
-					style="margin-right: 12px;width: 160px;">
+			<el-button class="tao-back-button top-box-back" type="primary" icon="el-icon-back" @click="goback" size="small">返回</el-button>
+			<div class="top-box-title">任务详情</div>
+			<div class="top-box-filters">
+				<el-select v-model="params.status" class="task-filter-select" placeholder="筛选状态" @change="getTaskItemList" clearable>
 					<el-option :label="item" :value="index" v-for="(item, index) in taskItemStatusList"></el-option>
 				</el-select>
-				<el-select v-model="params.type" placeholder="筛选操作类型" @change="getTaskItemList" clearable
-					style="width: 140px;">
+				<el-select v-model="params.type" class="task-filter-select task-filter-select-type" placeholder="筛选操作类型" @change="getTaskItemList" clearable>
 					<el-option label="复制/创建" :value="0"></el-option>
 					<el-option label="删除" :value="1"></el-option>
 					<el-option label="移动" :value="2"></el-option>
 				</el-select>
 			</div>
-			<div class="top-box-title">任务详情</div>
-			<menuRefresh :freshInterval="9973" :autoRefresh="false" :loading="loading" :needShow="1"
+			<menuRefresh class="top-box-refresh" :freshInterval="9973" :autoRefresh="false" :loading="loading" :needShow="1"
 				@getData="getTaskItemList"></menuRefresh>
 			<!-- <el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getTaskItemList"></el-button> -->
 		</div>
@@ -102,14 +99,36 @@
 		overflow: hidden;
 
 		.top-box {
-			display: flex;
+			display: grid;
+			grid-template-columns: auto auto 1fr auto;
 			align-items: center;
-			justify-content: space-between;
+			column-gap: 14px;
+			row-gap: 10px;
 			margin-bottom: 16px;
 			flex: 0 0 auto;
 
 			.top-box-title {
 				font-weight: bold;
+				white-space: nowrap;
+			}
+
+			.top-box-filters {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				min-width: 0;
+			}
+
+			.task-filter-select {
+				width: 160px;
+			}
+
+			.task-filter-select-type {
+				width: 140px;
+			}
+
+			.top-box-refresh {
+				justify-self: end;
 			}
 		}
 
@@ -127,27 +146,38 @@
 			padding: 12px;
 
 			.top-box {
-				flex-wrap: wrap;
-				gap: 8px;
+				grid-template-columns: auto 1fr auto;
+				column-gap: 8px;
+				row-gap: 10px;
+				align-items: center;
 
 				.top-box-title {
 					font-size: 16px;
+					text-align: center;
 				}
 
-				> div:first-child {
-					width: 100%;
-					flex-wrap: wrap;
+				.top-box-back {
+					grid-column: 1;
+				}
+
+				.top-box-refresh {
+					grid-column: 3;
+				}
+
+				.top-box-filters {
+					grid-column: 1 / -1;
+					display: grid;
+					grid-template-columns: repeat(2, minmax(0, 1fr));
 					gap: 8px;
+				}
 
-					.el-button,
-					.el-select {
-						font-size: 12px;
-					}
+				.task-filter-select,
+				.task-filter-select-type {
+					width: 100%;
+				}
 
-					.el-select {
-						width: calc(50% - 4px) !important;
-						margin-right: 0 !important;
-					}
+				::v-deep .task-filter-select .el-input__inner {
+					font-size: 12px;
 				}
 			}
 

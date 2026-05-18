@@ -53,6 +53,16 @@
 						{{scope.row.createTime | timeStampFilter}}
 					</template>
 				</el-table-column>
+				<el-table-column label="结束时间" width="160">
+					<template slot-scope="scope">
+						{{ finishTimeText(scope.row) }}
+					</template>
+				</el-table-column>
+				<el-table-column label="耗时" width="150">
+					<template slot-scope="scope">
+						{{ durationText(scope.row) }}
+					</template>
+				</el-table-column>
 				<el-table-column label="操作" width="180">
 					<template slot-scope="scope">
 						<div class="task-action-group">
@@ -204,6 +214,42 @@
 			isRunningTask(row) {
 				return row && row.status == 1;
 			},
+			finishTimeText(row) {
+				if (!row || this.isRunningTask(row)) {
+					return '--';
+				}
+				const duration = Number(row.duration);
+				if (!Number.isFinite(duration) || duration < 0 || !row.createTime) {
+					return '--';
+				}
+				return this.$options.filters.timeStampFilter(row.createTime + duration);
+			},
+			durationText(row) {
+				if (!row || !row.createTime) {
+					return '--';
+				}
+				if (this.isRunningTask(row)) {
+					return this.formatDuration(Math.max(0, Math.floor(Date.now() / 1000) - row.createTime));
+				}
+				const duration = Number(row.duration);
+				if (!Number.isFinite(duration) || duration < 0) {
+					return '--';
+				}
+				return this.formatDuration(duration);
+			},
+			formatDuration(seconds) {
+				const totalSeconds = Math.max(0, Number(seconds) || 0);
+				const days = Math.floor(totalSeconds / 86400);
+				const hours = Math.floor((totalSeconds % 86400) / 3600);
+				const minutes = Math.floor((totalSeconds % 3600) / 60);
+				const secs = Math.floor(totalSeconds % 60);
+				const parts = [];
+				if (days) parts.push(`${days}天`);
+				if (hours) parts.push(`${hours}小时`);
+				if (minutes) parts.push(`${minutes}分钟`);
+				if (secs || parts.length === 0) parts.push(`${secs}秒`);
+				return parts.join(' ');
+			},
 			taskRowClassName({ row }) {
 				return this.isRunningTask(row) ? 'is-running-task-row' : '';
 			},
@@ -305,8 +351,7 @@
 			flex-wrap: wrap;
 			gap: 16px;
 			box-sizing: border-box;
-			overflow-x: auto;
-			overflow-y: hidden;
+			overflow: hidden;
 
 			.page-tip {
 				display: flex;
@@ -323,7 +368,7 @@
 
 			::v-deep .el-pagination {
 				flex-shrink: 0;
-				white-space: nowrap;
+				white-space: normal;
 			}
 		}
 
@@ -357,41 +402,58 @@
 				padding-top: 8px;
 				padding-bottom: 2px;
 				justify-content: center;
+				scrollbar-width: none;
+				-ms-overflow-style: none;
 
 				.page-tip {
 					display: none;
 				}
 
 				::v-deep .el-pagination {
-					width: 100%;
+					width: auto;
+					max-width: 100%;
 					justify-content: center;
+					align-items: center;
+					flex-wrap: nowrap;
+					column-gap: 6px;
+					min-width: 0;
 					
 					.el-pagination__total,
 					.el-pagination__jump {
 						display: none;
 					}
+				}
+
+				::v-deep .el-pagination > * {
+					min-width: 0;
+				}
+
+				::v-deep .el-pagination__sizes {
+					margin: 0;
+				}
+
+				::v-deep .el-pagination__sizes .el-input {
+					width: 84px;
+				}
+
+				::v-deep .el-pagination__sizes .el-input__inner {
+					padding: 0 22px 0 8px;
+				}
+
+				::v-deep .el-pagination button,
+				::v-deep .el-pager li {
+					min-width: 28px;
+				}
+
+				::v-deep .el-pager li {
+					margin: 0 2px;
 				}
 			}
-		}
-	}
 
-	// 超小屏幕适配
-	@media (max-width: 480px) {
-		.task {
-			.page {
-				::v-deep .el-pagination {
-					.el-pagination__total,
-					.el-pagination__jump {
-						display: none;
-					}
-					
-					// 在超小屏幕上保持 sizes 显示，但可以调整样式
-					.el-pagination__sizes {
-						.el-input__inner {
-							padding: 0 20px 0 8px;
-						}
-					}
-				}
+			.page::-webkit-scrollbar {
+				width: 0;
+				height: 0;
+				display: none;
 			}
 		}
 	}

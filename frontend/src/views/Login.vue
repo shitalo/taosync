@@ -8,9 +8,9 @@
 			<h1>把同步任务交给桃桃。</h1>
 			<p>连接 OpenList 引擎，编排作业、通知与任务流水，在一个轻量控制台里完成日常同步。</p>
 		</div>
-		<div class="theme-toggle" @click="toggleTheme">
+		<button type="button" class="theme-toggle" @click="toggleTheme" :aria-label="vuex_theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'">
 			<i :class="vuex_theme === 'dark' ? 'el-icon-sunrise' : 'el-icon-moon'"></i>
-		</div>
+		</button>
 		<div class="loginArea">
 			<div class="logo">
 				<div class="logo-badge">T</div>
@@ -400,11 +400,13 @@
 		}
 
 		.theme-toggle {
+			appearance: none;
 			position: absolute;
 			top: clamp(24px, 4vw, 44px);
 			right: clamp(24px, 4vw, 44px);
 			width: 46px;
 			height: 46px;
+			padding: 0;
 			display: flex;
 			align-items: center;
 			justify-content: center;
@@ -415,12 +417,35 @@
 			font-size: 24px;
 			cursor: pointer;
 			color: var(--brand);
-			transition: transform .24s ease, background .24s ease;
+			transition: transform .24s ease, background .24s ease, box-shadow .24s ease;
 			z-index: 2;
+			transform: translateY(0) rotate(0deg);
 
-			&:hover {
-				transform: translateY(-2px) rotate(-8deg);
-				background: var(--login-toggle-hover);
+			&:focus-visible {
+				outline: none;
+				box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-soft) 70%, transparent), 0 10px 30px rgba(0, 0, 0, .12);
+			}
+
+			&:active {
+				transform: scale(.96);
+			}
+
+			i {
+				pointer-events: none;
+			}
+
+			@media (hover: hover) and (pointer: fine) {
+				&:hover {
+					transform: translateY(-2px) rotate(-8deg);
+					background: var(--login-toggle-hover);
+				}
+			}
+
+			@media (hover: none) {
+				&:hover {
+					transform: translateY(0) rotate(0deg);
+					background: var(--login-toggle-bg);
+				}
 			}
 		}
 
@@ -436,11 +461,13 @@
 			box-shadow: var(--login-panel-shadow);
 			backdrop-filter: blur(14px);
 			color: var(--text-primary);
+			overflow: hidden;
 
 			&::before {
 				content: "";
 				position: absolute;
 				inset: 0;
+				border-radius: inherit;
 				background:
 					radial-gradient(circle at top right, var(--brand-soft), transparent 32%),
 					radial-gradient(circle at bottom left, color-mix(in srgb, var(--accent) 14%, transparent), transparent 30%);
@@ -576,7 +603,7 @@
 		}
 	}
 
-		@media (max-width: 900px) {
+	@media (max-width: 900px) {
 		.login {
 			grid-template-columns: 1fr;
 			place-items: center;
@@ -593,8 +620,8 @@
 			}
 
 			.theme-toggle {
-				top: 16px;
-				right: 16px;
+				top: calc(env(safe-area-inset-top, 0px) + 24px);
+				right: calc(env(safe-area-inset-right, 0px) + 24px);
 			}
 		}
 	}
