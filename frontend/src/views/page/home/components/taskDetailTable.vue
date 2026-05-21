@@ -6,8 +6,8 @@
 					<i :class="stateLoading ? 'el-icon-loading' : 'el-icon-document-remove'"></i>
 				</div>
 				<div class="state-copy">
-					<div class="state-title">{{ stateLoading ? '正在读取任务明细' : '当前没有明细记录' }}</div>
-					<div class="state-desc">{{ stateText }}</div>
+					<div class="state-title">{{ stateTitle }}</div>
+					<div class="state-desc">{{ stateDesc }}</div>
 				</div>
 			</div>
 			<template v-else>
@@ -105,6 +105,22 @@ export default {
 		hasLoaded: {
 			type: Boolean,
 			default: false
+		},
+		loadingTitle: {
+			type: String,
+			default: '正在读取任务明细'
+		},
+		loadingDesc: {
+			type: String,
+			default: '正在同步最新数据，请稍等片刻。'
+		},
+		emptyTitle: {
+			type: String,
+			default: '当前没有明细记录'
+		},
+		emptyDesc: {
+			type: String,
+			default: '当前筛选条件下没有匹配记录，换个条件再看。'
 		}
 	},
 	data() {
@@ -124,8 +140,11 @@ export default {
 		stateLoading() {
 			return !this.hasLoaded || this.loading;
 		},
-		stateText() {
-			return this.stateLoading ? '正在同步最新数据，请稍等片刻。' : '当前筛选条件下没有匹配记录，换个条件再看。';
+		stateTitle() {
+			return this.stateLoading ? this.loadingTitle : this.emptyTitle;
+		},
+		stateDesc() {
+			return this.stateLoading ? this.loadingDesc : this.emptyDesc;
 		},
 		paginationLayout() {
 			return this.isMobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next, jumper';

@@ -105,6 +105,8 @@
 						:taskItemData="toTable"
 						:loading="loadingTask"
 						:hasLoaded="taskListHasLoaded"
+						:emptyTitle="taskListEmptyTitle"
+						:emptyDesc="taskListEmptyDesc"
 						@pageChange="pageChange">
 					</taskDetailTable>
 				</div>
@@ -170,6 +172,24 @@
 			},
 			emptyStateLoading() {
 				return !this.hasLoaded || this.loading;
+			},
+			taskListEmptyTitle() {
+				if (this.current && !this.current.scanFinish && this.current.firstSync === null) {
+					return '扫描中，暂未发现明细';
+				}
+				if (this.current && !this.current.scanFinish) {
+					return '当前筛选下暂无明细';
+				}
+				return '当前没有明细记录';
+			},
+			taskListEmptyDesc() {
+				if (this.current && !this.current.scanFinish && this.current.firstSync === null) {
+					return '系统正在扫描待同步内容，发现文件后会自动出现在这里。';
+				}
+				if (this.current && !this.current.scanFinish) {
+					return '扫描仍在继续，符合当前筛选条件的明细出现后会自动展示。';
+				}
+				return '当前筛选条件下没有匹配记录，换个条件再看。';
 			}
 		},
 		data() {
@@ -198,14 +218,14 @@
 			this.loadingController = createDelayedLoadingController({
 				show: () => { this.loading = true; },
 				hide: () => { this.loading = false; },
-				delay: 120,
-				minDuration: 180
+				delay: 0,
+				minDuration: 320
 			});
 			this.taskListLoadingController = createDelayedLoadingController({
 				show: () => { this.loadingTask = true; },
 				hide: () => { this.loadingTask = false; },
-				delay: 120,
-				minDuration: 180
+				delay: 0,
+				minDuration: 320
 			});
 			this.startRefresh();
 		},
@@ -311,7 +331,7 @@
 				} else {
 					this.loading = false;
 				}
-				this.getTaskList();
+				this.getTaskList({ silent: true });
 			},
 			scheduleFinish() {
 				if (this.finishTimer) {
@@ -325,15 +345,16 @@
 					}
 				}, 1800);
 			},
-			getTaskList() {
+			getTaskList(options = {}) {
 				if (this.current === null || this.isFetchingTaskList || this.cuTaskSelect === 1) {
 					return;
 				}
+				const silent = options.silent === true;
 				this.isFetchingTaskList = true;
-				if (this.cuTaskList.length === 0) {
+				if (!silent && this.cuTaskList.length === 0) {
 					this.taskListHasLoaded = false;
 				}
-				const loadToken = this.taskListLoadingController ? this.taskListLoadingController.start() : 0;
+				const loadToken = !silent && this.taskListLoadingController ? this.taskListLoadingController.start() : 0;
 				jobGetTaskCurrent({
 					id: this.jobId,
 					status: this.cuTaskSelect
@@ -341,17 +362,17 @@
 					this.cuTaskList = res.data || [];
 					this.taskListHasLoaded = true;
 					this.isFetchingTaskList = false;
-					if (this.taskListLoadingController) {
+					if (!silent && this.taskListLoadingController) {
 						this.taskListLoadingController.finish(loadToken);
-					} else {
+					} else if (!silent) {
 						this.loadingTask = false;
 					}
 				}).catch(() => {
 					this.taskListHasLoaded = true;
 					this.isFetchingTaskList = false;
-					if (this.taskListLoadingController) {
+					if (!silent && this.taskListLoadingController) {
 						this.taskListLoadingController.finish(loadToken);
-					} else {
+					} else if (!silent) {
 						this.loadingTask = false;
 					}
 				});
