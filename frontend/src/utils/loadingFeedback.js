@@ -9,6 +9,7 @@ export function createDelayedLoadingController({
 	let hideTimer = null;
 	let visible = false;
 	let visibleAt = 0;
+	let activeMinDuration = minDuration;
 
 	const clearDelay = () => {
 		if (delayTimer) {
@@ -32,19 +33,26 @@ export function createDelayedLoadingController({
 	};
 
 	return {
-		start() {
+		start(options = {}) {
 			activeToken += 1;
 			const token = activeToken;
+			const nextDelay = options.delay == null ? delay : options.delay;
+			activeMinDuration = options.minDuration == null ? minDuration : options.minDuration;
 			clearDelay();
 			clearHide();
-			delayTimer = setTimeout(() => {
+			const reveal = () => {
 				if (activeToken !== token) {
 					return;
 				}
 				visible = true;
 				visibleAt = Date.now();
 				show();
-			}, delay);
+			};
+			if (nextDelay <= 0) {
+				reveal();
+			} else {
+				delayTimer = setTimeout(reveal, nextDelay);
+			}
 			return token;
 		},
 		finish(token) {
@@ -57,7 +65,7 @@ export function createDelayedLoadingController({
 				hide();
 				return;
 			}
-			const wait = Math.max(0, minDuration - (Date.now() - visibleAt));
+			const wait = Math.max(0, activeMinDuration - (Date.now() - visibleAt));
 			hideTimer = setTimeout(close, wait);
 		},
 		dispose() {

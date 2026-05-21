@@ -39,6 +39,7 @@
 	import {
 		editPwd
 	} from "@/api/user";
+	import { createDelayedLoadingController } from '@/utils/loadingFeedback';
 	export default {
 		name: 'User',
 		data() {
@@ -58,6 +59,7 @@
 					passwd2: null
 				},
 				loading: false,
+				loadingController: null,
 				rules: {
 					oldPasswd: [{
 						required: true,
@@ -76,21 +78,41 @@
 				}
 			};
 		},
-		created() {},
+		created() {
+			this.loadingController = createDelayedLoadingController({
+				show: () => { this.loading = true; },
+				hide: () => { this.loading = false; },
+				delay: 120,
+				minDuration: 180
+			});
+		},
+		beforeDestroy() {
+			if (this.loadingController) {
+				this.loadingController.dispose();
+			}
+		},
 		methods: {
 			resetPasswd() {
 				this.$refs.resetForm.validate((valid) => {
 					if (valid) {
-						this.loading = true;
+						const loadToken = this.loadingController ? this.loadingController.start() : 0;
 						editPwd(this.resetForm).then(res => {
 							this.$message({
 								message: res.msg,
 								type: 'success'
 							});
 							this.$refs.resetForm.resetFields();
-							this.loading = false;
+							if (this.loadingController) {
+								this.loadingController.finish(loadToken);
+							} else {
+								this.loading = false;
+							}
 						}).catch(err => {
-							this.loading = false;
+							if (this.loadingController) {
+								this.loadingController.finish(loadToken);
+							} else {
+								this.loading = false;
+							}
 						})
 					} else {
 						return false;

@@ -67,6 +67,7 @@
 		login,
 		resetPwd
 	} from "@/api/user";
+	import { createDelayedLoadingController } from '@/utils/loadingFeedback';
 	export default {
 		name: 'Login',
 		data() {
@@ -119,6 +120,7 @@
 					}]
 				},
 				showPwd: false,
+				loadingController: null,
 				pwdForm: {
 					userName: null,
 					key: null,
@@ -126,6 +128,19 @@
 					passwd2: null
 				}
 			};
+		},
+		created() {
+			this.loadingController = createDelayedLoadingController({
+				show: () => { this.loading = true; },
+				hide: () => { this.loading = false; },
+				delay: 120,
+				minDuration: 180
+			});
+		},
+		beforeDestroy() {
+			if (this.loadingController) {
+				this.loadingController.dispose();
+			}
 		},
 		computed: {
 			vuex_theme() {
@@ -148,13 +163,21 @@
 				this.$refs.loginForm.validate((valid) => {
 					if (valid) {
 						Cookies.remove(this.vuex_cookieName);
-						this.loading = true;
+						const loadToken = this.loadingController ? this.loadingController.start() : 0;
 						login(this.loginForm).then(res => {
 							this.$setVuex('vuex_userInfo', res.data);
 							this.$router.replace('/home');
-							this.loading = false;
+							if (this.loadingController) {
+								this.loadingController.finish(loadToken);
+							} else {
+								this.loading = false;
+							}
 						}).catch(err => {
-							this.loading = false;
+							if (this.loadingController) {
+								this.loadingController.finish(loadToken);
+							} else {
+								this.loading = false;
+							}
 
 						})
 					} else {
@@ -182,16 +205,24 @@
 			fogetSubmit() {
 				this.$refs.resetForm.validate((valid) => {
 					if (valid) {
-						this.loading = true;
+						const loadToken = this.loadingController ? this.loadingController.start() : 0;
 						resetPwd(this.pwdForm).then(res => {
 							this.closePwd();
 							this.$message({
 								message: '密码重置成功，请使用新密码登录',
 								type: 'success'
 							});
-							this.loading = false;
+							if (this.loadingController) {
+								this.loadingController.finish(loadToken);
+							} else {
+								this.loading = false;
+							}
 						}).catch(err => {
-							this.loading = false;
+							if (this.loadingController) {
+								this.loadingController.finish(loadToken);
+							} else {
+								this.loading = false;
+							}
 						})
 					} else {
 						return false;

@@ -123,6 +123,7 @@
 		parseTime
 	} from "@/utils/utils";
 	import { createDelayedLoadingController } from '@/utils/loadingFeedback';
+	import { createActionLoadingMap } from '@/utils/actionLoading';
 	import EmptyStateCard from '@/views/components/EmptyStateCard.vue';
 	import ManagementHero from '@/views/components/ManagementHero.vue';
 	import ManagementListToolbar from '@/views/components/ManagementListToolbar.vue';
@@ -153,6 +154,7 @@
 				hasLoaded: false,
 				isMobile: false,
 				loadingController: null,
+				actionLoadingMap: null,
 				deleteLoading: false,
 				editLoading: false,
 				editData: null,
@@ -184,6 +186,7 @@
 				show: () => { this.getLoading = true; },
 				hide: () => { this.getLoading = false; }
 			});
+			this.actionLoadingMap = createActionLoadingMap();
 			this.getOpenListList();
 		},
 		mounted() {
@@ -194,6 +197,9 @@
 			window.removeEventListener('resize', this.checkMobile);
 			if (this.loadingController) {
 				this.loadingController.dispose();
+			}
+			if (this.actionLoadingMap) {
+				this.actionLoadingMap.dispose();
 			}
 		},
 		methods: {
@@ -256,10 +262,14 @@
 				this.$refs.addRule.validate((valid) => {
 					if (valid) {
 						this.editData.url = this.ensureHttpPrefix(this.editData.url);
-						this.editLoading = true;
+						const loadToken = this.actionLoadingMap ? this.actionLoadingMap.start(this, 'editLoading') : 0;
 						if (this.editFlag) {
 							openlistPut(this.editData).then(res => {
-								this.editLoading = false;
+								if (this.actionLoadingMap) {
+									this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+								} else {
+									this.editLoading = false;
+								}
 								this.$message({
 									message: res.msg,
 									type: 'success'
@@ -267,11 +277,19 @@
 								this.closeShow();
 								this.getOpenListList();
 							}).catch(err => {
-								this.editLoading = false;
+								if (this.actionLoadingMap) {
+									this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+								} else {
+									this.editLoading = false;
+								}
 							})
 						} else {
 							openlistPost(this.editData).then(res => {
-								this.editLoading = false;
+								if (this.actionLoadingMap) {
+									this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+								} else {
+									this.editLoading = false;
+								}
 								this.$message({
 									message: res.msg,
 									type: 'success'
@@ -279,7 +297,11 @@
 								this.closeShow();
 								this.getOpenListList();
 							}).catch(err => {
-								this.editLoading = false;
+								if (this.actionLoadingMap) {
+									this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+								} else {
+									this.editLoading = false;
+								}
 							})
 						}
 					}
@@ -291,16 +313,24 @@
 					cancelButtonText: '取消',
 					type: 'warning'
 				}).then(() => {
-					this.deleteLoading = true;
+					const loadToken = this.actionLoadingMap ? this.actionLoadingMap.start(this, 'deleteLoading') : 0;
 					openlistDelete(openlistId).then(res => {
-						this.deleteLoading = false;
+						if (this.actionLoadingMap) {
+							this.actionLoadingMap.finish(this, 'deleteLoading', loadToken);
+						} else {
+							this.deleteLoading = false;
+						}
 						this.$message({
 							message: res.msg,
 							type: 'success'
 						});
 						this.getOpenListList();
 					}).catch(err => {
-						this.deleteLoading = false;
+						if (this.actionLoadingMap) {
+							this.actionLoadingMap.finish(this, 'deleteLoading', loadToken);
+						} else {
+							this.deleteLoading = false;
+						}
 					})
 				});
 			},

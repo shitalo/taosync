@@ -1,49 +1,73 @@
 <template>
 	<div class="taskCurrent">
 		<div class="content-none-data" v-if="current === null">
-			{{loading ? '加载中' : '作业未在进行中'}}
+			{{ emptyStateLoading ? '加载中...' : '作业未在进行中' }}
 		</div>
 		<div class="current-box" v-else>
 			<div class="current-box-top">
 				<div class="current-box-top-left">
 					<div class="top-line">
-						<div style="display: flex;align-items: center;min-width: 0;flex: 1;">
-							整体进度：<span class="info-value" v-if="current.firstSync === null" style="display: inline-block;">暂未发现需同步文件</span>
-							<template v-else style="display: inline-flex;align-items: center;">
-								<el-progress :stroke-width="20" :text-inside="true" style="width: 130px;flex-shrink: 0;"
-									color="rgba(64, 158, 255, .8)" text-color="#fff"
+						<div style="display: flex; align-items: center; min-width: 0; flex: 1;">
+							整体进度：
+							<span class="info-value" v-if="current.firstSync === null" style="display: inline-block;">暂未发现需同步文件</span>
+							<template v-else style="display: inline-flex; align-items: center;">
+								<el-progress
+									:stroke-width="20"
+									:text-inside="true"
+									style="width: 130px; flex-shrink: 0;"
+									color="rgba(64, 158, 255, .8)"
+									text-color="#fff"
 									define-back-color="rgba(64, 158, 255, .3)"
 									:percentage="Number(current.allProgress.toFixed(4))"></el-progress>
-								<el-tooltip v-if="!current.scanFinish" effect="dark" content="扫描未完成前，进度不可靠仅供参考"
+								<el-tooltip
+									v-if="!current.scanFinish"
+									effect="dark"
+									content="扫描未完成前，进度仅供参考"
 									placement="top-end">
-									<i class="el-icon-question" style="margin-left: 6px;flex-shrink: 0;"></i>
+									<i class="el-icon-question" style="margin-left: 6px; flex-shrink: 0;"></i>
 								</el-tooltip>
 							</template>
 						</div>
-						<div>当前状态：<span class="info-value">{{currentStatusText}}</span></div>
-						<div>平均速度：<span class="info-value" v-if="current.firstSync === null">--</span>
-							<span class="info-value" v-else>{{current.speedAvg | sizeFilter}}/s</span>
-							<el-tooltip v-if="current.firstSync !== null" effect="dark" placement="top-end" content="如果扫描用时太久，估算速度可能有很大误差">
+						<div>当前状态：<span class="info-value">{{ currentStatusText }}</span></div>
+						<div>
+							平均速度：
+							<span class="info-value" v-if="current.firstSync === null">--</span>
+							<span class="info-value" v-else>{{ current.speedAvg | sizeFilter }}/s</span>
+							<el-tooltip
+								v-if="current.firstSync !== null"
+								effect="dark"
+								placement="top-end"
+								content="如果扫描用时太久，估算速度可能有较大误差">
 								<i class="el-icon-question" style="margin-left: 6px;"></i>
 							</el-tooltip>
 						</div>
-						<div>瞬时速度：<span class="info-value" v-if="current.firstSync === null">--</span>
-							<span class="info-value" v-else>{{current.speed | sizeFilter}}/s</span>
+						<div>
+							瞬时速度：
+							<span class="info-value" v-if="current.firstSync === null">--</span>
+							<span class="info-value" v-else>{{ current.speed | sizeFilter }}/s</span>
 						</div>
 					</div>
 					<div class="top-line">
-						<div>持续时间：<span class="info-value">{{current.durationText}}</span></div>
-						<div>预计还要：<span class="info-value">{{current.firstSync === null ? '--' : current.remainTimeText}}</span>
-							<el-tooltip effect="dark" placement="top-end"
-								:content="`${current.scanFinish ? '' : '扫描未完成前，预计时间仅供参考；'}如果扫描用时太久，估算时间可能有很大误差`">
+						<div>持续时间：<span class="info-value">{{ current.durationText }}</span></div>
+						<div>
+							预计还要：<span class="info-value">{{ current.firstSync === null ? '--' : current.remainTimeText }}</span>
+							<el-tooltip
+								effect="dark"
+								placement="top-end"
+								:content="`${current.scanFinish ? '' : '扫描未完成前，预计时间仅供参考；'}如果扫描用时太久，估算时间可能有较大误差`">
 								<i class="el-icon-question" style="margin-left: 6px;"></i>
 							</el-tooltip>
 						</div>
-						<div>开始时间：<span class="info-value">{{current.createTime | timeStampFilter}}</span></div>
-						<div>预计完成：<span class="info-value" v-if="current.firstSync === null">--</span>
-							<span class="info-value" v-else>{{(current.createTime + current.duration + current.remainTime) | timeStampFilter}}</span>
-							<el-tooltip v-if="current.firstSync !== null" effect="dark" placement="top-end"
-								:content="`${current.scanFinish ? '' : '扫描未完成前，预计时间仅供参考；'}如果扫描用时太久，估算时间可能有很大误差`">
+						<div>开始时间：<span class="info-value">{{ current.createTime | timeStampFilter }}</span></div>
+						<div>
+							预计完成：
+							<span class="info-value" v-if="current.firstSync === null">--</span>
+							<span class="info-value" v-else>{{ (current.createTime + current.duration + current.remainTime) | timeStampFilter }}</span>
+							<el-tooltip
+								v-if="current.firstSync !== null"
+								effect="dark"
+								placement="top-end"
+								:content="`${current.scanFinish ? '' : '扫描未完成前，预计时间仅供参考；'}如果扫描用时太久，估算时间可能有较大误差`">
 								<i class="el-icon-question" style="margin-left: 6px;"></i>
 							</el-tooltip>
 						</div>
@@ -55,29 +79,33 @@
 			</div>
 			<div class="current-box-bottom">
 				<div class="current-empty-pane" v-if="current.firstSync === null">
-					<div class="content-none-data">扫描中，暂无需要同步的文件，请耐心等待...</div>
+					<div class="content-none-data">扫描中，暂未发现需要同步的文件，请耐心等待...</div>
 				</div>
 				<taskCurrentEcharts v-else class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
 				<div class="current-box-task">
 					<div class="current-box-task-left">
-						<div @click="changeTaskCu(0)"
-							:class="`task-left-item${cuTaskSelect == 0 ? ' is-current' : ''}`">
-							等待中</div>
-						<div @click="changeTaskCu(1)"
-							:class="`task-left-item${cuTaskSelect == 1 ? ' is-current' : ''}`">
-							进行中</div>
-						<div @click="changeTaskCu(2)"
-							:class="`task-left-item${cuTaskSelect == 2 ? ' is-current' : ''}`">
-							成功</div>
-						<div @click="changeTaskCu(7)"
-							:class="`task-left-item${cuTaskSelect == 7 ? ' is-current' : ''}`">
-							失败</div>
-						<div @click="changeTaskCu(-1)"
-							:class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(0)" :class="`task-left-item${cuTaskSelect == 0 ? ' is-current' : ''}`">
+							等待中
+						</div>
+						<div @click="changeTaskCu(1)" :class="`task-left-item${cuTaskSelect == 1 ? ' is-current' : ''}`">
+							进行中
+						</div>
+						<div @click="changeTaskCu(2)" :class="`task-left-item${cuTaskSelect == 2 ? ' is-current' : ''}`">
+							成功
+						</div>
+						<div @click="changeTaskCu(7)" :class="`task-left-item${cuTaskSelect == 7 ? ' is-current' : ''}`">
+							失败
+						</div>
+						<div @click="changeTaskCu(-1)" :class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
 							其他
 						</div>
 					</div>
-					<taskDetailTable class="current-box-task-right" :taskItemData="toTable" @pageChange="pageChange">
+					<taskDetailTable
+						class="current-box-task-right"
+						:taskItemData="toTable"
+						:loading="loadingTask"
+						:hasLoaded="taskListHasLoaded"
+						@pageChange="pageChange">
 					</taskDetailTable>
 				</div>
 			</div>
@@ -90,9 +118,11 @@
 		jobGetTaskCurrent,
 		jobPut
 	} from "@/api/job";
+	import { createDelayedLoadingController } from '@/utils/loadingFeedback';
 	import menuRefresh from './menuRefresh';
 	import taskCurrentEcharts from './taskCurrentEcharts';
 	import taskDetailTable from "./taskDetailTable";
+
 	export default {
 		name: 'Task',
 		props: {
@@ -114,14 +144,14 @@
 			toTable() {
 				const count = this.cuTaskList.length;
 				let dataList = [];
-				if (count != 0) {
+				if (count !== 0) {
 					const startIndex = (this.toTableParams.pageNum - 1) * this.toTableParams.pageSize;
 					dataList = this.cuTaskList.slice(startIndex, startIndex + this.toTableParams.pageSize);
 				}
 				return {
 					dataList,
 					count
-				}
+				};
 			},
 			currentStatusText() {
 				if (this.current === null) {
@@ -137,15 +167,24 @@
 					return '扫描中';
 				}
 				return '扫描并同步中';
+			},
+			emptyStateLoading() {
+				return !this.hasLoaded || this.loading;
 			}
 		},
 		data() {
 			return {
 				loading: false,
 				loadingTask: false,
+				hasLoaded: false,
+				taskListHasLoaded: true,
+				isFetchingCurrent: false,
+				isFetchingTaskList: false,
 				timer: null,
 				hideTimer: null,
 				finishTimer: null,
+				loadingController: null,
+				taskListLoadingController: null,
 				cuTaskSelect: 1,
 				cuTaskList: [],
 				toTableParams: {
@@ -153,12 +192,22 @@
 					pageNum: 1
 				},
 				current: null
-
 			};
 		},
 		created() {
+			this.loadingController = createDelayedLoadingController({
+				show: () => { this.loading = true; },
+				hide: () => { this.loading = false; },
+				delay: 120,
+				minDuration: 180
+			});
+			this.taskListLoadingController = createDelayedLoadingController({
+				show: () => { this.loadingTask = true; },
+				hide: () => { this.loadingTask = false; },
+				delay: 120,
+				minDuration: 180
+			});
 			this.startRefresh();
-			// this.test();
 		},
 		beforeDestroy() {
 			this.endRefresh();
@@ -170,44 +219,16 @@
 				clearTimeout(this.finishTimer);
 				this.finishTimer = null;
 			}
+			if (this.loadingController) {
+				this.loadingController.dispose();
+			}
+			if (this.taskListLoadingController) {
+				this.taskListLoadingController.dispose();
+			}
 		},
 		methods: {
-			test() {
-				let current = {
-					'scanFinish': false,
-					num: {
-						"wait": 0,
-						"running": 1,
-						"success": 0,
-						"fail": 0,
-						"other": 0
-					},
-					size: {
-						"wait": 0,
-						"running": 134678,
-						"success": 0,
-						"fail": 0,
-						"other": 0
-					},
-					'firstSync': 1749042992,
-					'createTime': 1749042892,
-					'duration': 661,
-					'doingTask': [{
-						'srcPath': '/A/',
-						'dstPath': '/B/',
-						'isPath': 0,
-						'fileName': '1.log',
-						'fileSize': 134678,
-						'status': 1,
-						'type': 0,
-						'progress': 55.7,
-						'errMsg': null,
-						'createTime': 1748785129
-					}]
-				};
-				this.dealWithCurrent(current);
-			},
 			startRefresh() {
+				this.getCurrent();
 				this.timer = setInterval(() => {
 					this.getCurrent();
 				}, 610);
@@ -215,22 +236,31 @@
 			endRefresh() {
 				if (this.timer) {
 					clearInterval(this.timer);
+					this.timer = null;
 				}
 			},
 			getCurrent() {
-				if (this.loading) {
-					return
+				if (this.isFetchingCurrent) {
+					return;
 				}
-				this.loading = true;
+				this.isFetchingCurrent = true;
+				const loadToken = this.loadingController ? this.loadingController.start() : 0;
 				jobGetTaskCurrent({
 					id: this.jobId
 				}).then(res => {
-					this.dealWithCurrent(res.data);
-				}).catch(err => {
-					this.loading = false;
-				})
+					this.dealWithCurrent(res.data, loadToken);
+				}).catch(() => {
+					this.isFetchingCurrent = false;
+					if (this.loadingController) {
+						this.loadingController.finish(loadToken);
+					} else {
+						this.loading = false;
+					}
+				});
 			},
-			dealWithCurrent(current) {
+			dealWithCurrent(current, loadToken = 0) {
+				this.isFetchingCurrent = false;
+				this.hasLoaded = true;
 				if (current === null) {
 					if (this.finishOnEmpty) {
 						this.scheduleFinish();
@@ -246,31 +276,42 @@
 							}, 1800);
 						}
 					}
-					this.loading = false;
-				} else {
-					if (this.finishTimer) {
-						clearTimeout(this.finishTimer);
-						this.finishTimer = null;
+					if (this.loadingController) {
+						this.loadingController.finish(loadToken);
+					} else {
+						this.loading = false;
 					}
-					if (this.hideTimer) {
-						clearTimeout(this.hideTimer);
-						this.hideTimer = null;
-					}
-					if (this.current === null) {
-						this.show();
-					}
-					current.durationText = this.formatSeconds(current.duration);
-					let calcs = this.calcSpeedAndSize(current);
-					if (this.cuTaskSelect === 1) {
-						this.cuTaskList = current.doingTask;
-					}
-					this.current = {
-						...current,
-						...calcs
-					};
-					this.loading = false;
-					this.getTaskList();
+					return;
 				}
+
+				if (this.finishTimer) {
+					clearTimeout(this.finishTimer);
+					this.finishTimer = null;
+				}
+				if (this.hideTimer) {
+					clearTimeout(this.hideTimer);
+					this.hideTimer = null;
+				}
+				if (this.current === null) {
+					this.show();
+				}
+
+				current.durationText = this.formatSeconds(current.duration);
+				const calcs = this.calcSpeedAndSize(current);
+				if (this.cuTaskSelect === 1) {
+					this.cuTaskList = current.doingTask || [];
+					this.taskListHasLoaded = true;
+				}
+				this.current = {
+					...current,
+					...calcs
+				};
+				if (this.loadingController) {
+					this.loadingController.finish(loadToken);
+				} else {
+					this.loading = false;
+				}
+				this.getTaskList();
 			},
 			scheduleFinish() {
 				if (this.finishTimer) {
@@ -285,38 +326,52 @@
 				}, 1800);
 			},
 			getTaskList() {
-				if (this.current === null || this.loadingTask || this.cuTaskSelect === 1) {
-					return
+				if (this.current === null || this.isFetchingTaskList || this.cuTaskSelect === 1) {
+					return;
 				}
-				this.loadingTask = true;
+				this.isFetchingTaskList = true;
+				if (this.cuTaskList.length === 0) {
+					this.taskListHasLoaded = false;
+				}
+				const loadToken = this.taskListLoadingController ? this.taskListLoadingController.start() : 0;
 				jobGetTaskCurrent({
 					id: this.jobId,
 					status: this.cuTaskSelect
 				}).then(res => {
-					this.cuTaskList = res.data;
-					this.loadingTask = false;
-				}).catch(err => {
-					setTimeout(() => {
+					this.cuTaskList = res.data || [];
+					this.taskListHasLoaded = true;
+					this.isFetchingTaskList = false;
+					if (this.taskListLoadingController) {
+						this.taskListLoadingController.finish(loadToken);
+					} else {
 						this.loadingTask = false;
-					}, 9973);
-				})
+					}
+				}).catch(() => {
+					this.taskListHasLoaded = true;
+					this.isFetchingTaskList = false;
+					if (this.taskListLoadingController) {
+						this.taskListLoadingController.finish(loadToken);
+					} else {
+						this.loadingTask = false;
+					}
+				});
 			},
 			calcSpeedAndSize(current) {
-				let doingSize = current.doingTask.reduce((sum, obj) => {
+				const doingTask = Array.isArray(current.doingTask) ? current.doingTask : [];
+				const doingSize = doingTask.reduce((sum, obj) => {
 					return sum + obj.fileSize * obj.progress / 100.0;
 				}, 0);
-				// 执行中-未完成的文件大小
-				let remainSize = current.size.running - doingSize + current.size.wait;
-				let doneSize = current.size.success + doingSize;
+				const remainSize = current.size.running - doingSize + current.size.wait;
+				const doneSize = current.size.success + doingSize;
 				let speed = 0;
 				if (this.current !== null) {
 					speed = this.current.speed;
-					if (current.duration - this.current.duration != 0 && doneSize - this.current.doneSize != 0) {
+					if (current.duration - this.current.duration !== 0 && doneSize - this.current.doneSize !== 0) {
 						speed = (doneSize - this.current.doneSize) / (current.duration - this.current.duration);
 					}
 				}
-				let speedAvg = (doneSize) / (current.duration - current.firstSync + current.createTime);
-				let remainTime = parseInt(remainSize / speedAvg);
+				const speedAvg = doneSize / (current.duration - current.firstSync + current.createTime);
+				const remainTime = parseInt(remainSize / speedAvg);
 				return {
 					remainSize,
 					doneSize,
@@ -325,43 +380,35 @@
 					remainTime,
 					remainTimeText: this.formatSeconds(remainTime),
 					allProgress: doneSize / (doneSize + remainSize) * 100
-				}
+				};
 			},
 			changeTaskCu(status) {
-				if (this.cuTaskSelect === status) {
-					return
+				if (this.cuTaskSelect === status || this.current === null) {
+					return;
 				}
 				this.cuTaskSelect = status;
-				if (status == 1) {
-					this.cuTaskList = this.current.doingTask;
+				this.toTableParams.pageNum = 1;
+				if (status === 1) {
+					this.cuTaskList = this.current.doingTask || [];
+					this.taskListHasLoaded = true;
 				} else {
-					this.cuTaskList = [];
+					this.getTaskList();
 				}
 			},
 			pageChange(val) {
 				this.toTableParams = val;
 			},
 			formatSeconds(seconds) {
-				const days = Math.floor(seconds / (24 * 3600));
-				const hours = Math.floor((seconds % (24 * 3600)) / 3600);
-				const minutes = Math.floor((seconds % 3600) / 60);
-				const secs = seconds % 60;
-				const timeUnits = [{
-						value: days,
-						unit: '天'
-					},
-					{
-						value: hours,
-						unit: '小时'
-					},
-					{
-						value: minutes,
-						unit: '分钟'
-					},
-					{
-						value: secs,
-						unit: '秒'
-					}
+				const totalSeconds = Math.max(0, Number(seconds) || 0);
+				const days = Math.floor(totalSeconds / (24 * 3600));
+				const hours = Math.floor((totalSeconds % (24 * 3600)) / 3600);
+				const minutes = Math.floor((totalSeconds % 3600) / 60);
+				const secs = totalSeconds % 60;
+				const timeUnits = [
+					{ value: days, unit: '天' },
+					{ value: hours, unit: '小时' },
+					{ value: minutes, unit: '分钟' },
+					{ value: secs, unit: '秒' }
 				];
 				const nonZeroUnits = timeUnits.filter(unit => unit.value > 0);
 				if (nonZeroUnits.length === 0) return '0秒';
@@ -374,7 +421,7 @@
 				this.$emit('currentChange', 0);
 			},
 			abortJob() {
-				this.$confirm("中止任务不影响已完成的同步项，进行中或等待中的同步项将被取消，确定吗？", '提示', {
+				this.$confirm('中止任务不会影响已完成的同步项，进行中或等待中的同步项将被取消，确定吗？', '提示', {
 					confirmButtonText: '确定',
 					cancelButtonText: '取消',
 					type: 'warning'
@@ -383,13 +430,13 @@
 						pause: true,
 						id: Number(this.jobId),
 						abort: true
-					}).then(res => {
+					}).then(() => {
 						this.$message({
 							message: '中止指令已发送，请等待中止完成',
 							type: 'success'
 						});
-					}).catch(err => {})
-				})
+					}).catch(() => {});
+				});
 			}
 		}
 	}
@@ -452,7 +499,7 @@
 							color: var(--text-primary);
 							display: flex;
 							align-items: center;
-							
+
 							.info-value {
 								display: inline-block;
 								max-width: 100%;
@@ -471,7 +518,7 @@
 						}
 					}
 				}
-				
+
 				.current-box-top-right {
 					margin-left: 16px;
 					flex-shrink: 0;
@@ -566,7 +613,6 @@
 		}
 	}
 
-	// 移动端适配
 	@media (max-width: 768px) {
 		.taskCurrent {
 			padding: 0;

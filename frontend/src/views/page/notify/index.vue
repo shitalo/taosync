@@ -198,6 +198,7 @@
 	} from '@/api/notify';
 	import notifyMethod from '@/utils/notifyMethod';
 	import { createDelayedLoadingController } from '@/utils/loadingFeedback';
+	import { createActionLoadingMap } from '@/utils/actionLoading';
 	import EmptyStateCard from '@/views/components/EmptyStateCard.vue';
 	import ManagementHero from '@/views/components/ManagementHero.vue';
 	import ManagementListToolbar from '@/views/components/ManagementListToolbar.vue';
@@ -235,6 +236,7 @@
 				hasLoaded: false,
 				isMobile: false,
 				loadingController: null,
+				actionLoadingMap: null,
 				deleteLoading: false,
 				editLoading: false,
 				tstLoading: false,
@@ -314,6 +316,7 @@
 				show: () => { this.loading = true; },
 				hide: () => { this.loading = false; }
 			});
+			this.actionLoadingMap = createActionLoadingMap();
 			this.getData();
 		},
 		mounted() {
@@ -334,6 +337,9 @@
 			}
 			if (this.loadingController) {
 				this.loadingController.dispose();
+			}
+			if (this.actionLoadingMap) {
+				this.actionLoadingMap.dispose();
 			}
 		},
 		methods: {
@@ -485,16 +491,24 @@
 				this.isMobile = window.innerWidth <= 768;
 			},
 			enableNotify(notifyId, enable) {
-				this.enableLoading = true;
+				const loadToken = this.actionLoadingMap ? this.actionLoadingMap.start(this, 'enableLoading') : 0;
 				putEnableNotify(notifyId, enable).then(res => {
-					this.enableLoading = false;
+					if (this.actionLoadingMap) {
+						this.actionLoadingMap.finish(this, 'enableLoading', loadToken);
+					} else {
+						this.enableLoading = false;
+					}
 					this.$message({
 						message: res.msg,
 						type: 'success'
 					});
 					this.getData();
 				}).catch(err => {
-					this.enableLoading = false;
+					if (this.actionLoadingMap) {
+						this.actionLoadingMap.finish(this, 'enableLoading', loadToken);
+					} else {
+						this.enableLoading = false;
+					}
 				})
 			},
 			submit() {
@@ -502,10 +516,14 @@
 					if (valid) {
 						let dt = JSON.parse(JSON.stringify(this.editData));
 						dt.params = JSON.stringify(dt.params);
-						this.editLoading = true;
+						const loadToken = this.actionLoadingMap ? this.actionLoadingMap.start(this, 'editLoading') : 0;
 						if (this.editFlag) {
 							putEditNotify(dt).then(res => {
-								this.editLoading = false;
+								if (this.actionLoadingMap) {
+									this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+								} else {
+									this.editLoading = false;
+								}
 								this.$message({
 									message: res.msg,
 									type: 'success'
@@ -513,11 +531,19 @@
 								this.closeShow();
 								this.getData();
 							}).catch(err => {
-								this.editLoading = false;
+								if (this.actionLoadingMap) {
+									this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+								} else {
+									this.editLoading = false;
+								}
 							})
 						} else {
 							postAddNotify(dt).then(res => {
-								this.editLoading = false;
+								if (this.actionLoadingMap) {
+									this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+								} else {
+									this.editLoading = false;
+								}
 								this.$message({
 									message: res.msg,
 									type: 'success'
@@ -525,7 +551,11 @@
 								this.closeShow();
 								this.getData();
 							}).catch(err => {
-								this.editLoading = false;
+								if (this.actionLoadingMap) {
+									this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+								} else {
+									this.editLoading = false;
+								}
 							})
 						}
 					}
@@ -543,20 +573,28 @@
 				}
 			},
 			tstCuTrueDo(item) {
-				this.tstLoading = true;
+				const loadToken = this.actionLoadingMap ? this.actionLoadingMap.start(this, 'tstLoading') : 0;
 				let it = JSON.parse(JSON.stringify(item));
 				if (typeof it.params === 'object' && it.params !== null) {
 					it.params = JSON.stringify(it.params);
 				}
 				delete it.enable;
 				postAddNotify(it).then(res => {
-					this.tstLoading = false;
+					if (this.actionLoadingMap) {
+						this.actionLoadingMap.finish(this, 'tstLoading', loadToken);
+					} else {
+						this.tstLoading = false;
+					}
 					this.$message({
 						message: '测试消息已发送，请检查是否正确收到通知',
 						type: 'success'
 					});
 				}).catch(err => {
-					this.tstLoading = false;
+					if (this.actionLoadingMap) {
+						this.actionLoadingMap.finish(this, 'tstLoading', loadToken);
+					} else {
+						this.tstLoading = false;
+					}
 				})
 			},
 			delCu(id) {
@@ -565,16 +603,24 @@
 					cancelButtonText: '取消',
 					type: 'warning'
 				}).then(() => {
-					this.deleteLoading = true;
+					const loadToken = this.actionLoadingMap ? this.actionLoadingMap.start(this, 'deleteLoading') : 0;
 					delNotify(id).then(res => {
-						this.deleteLoading = false;
+						if (this.actionLoadingMap) {
+							this.actionLoadingMap.finish(this, 'deleteLoading', loadToken);
+						} else {
+							this.deleteLoading = false;
+						}
 						this.$message({
 							message: res.msg,
 							type: 'success'
 						});
 						this.getData();
 					}).catch(err => {
-						this.deleteLoading = false;
+						if (this.actionLoadingMap) {
+							this.actionLoadingMap.finish(this, 'deleteLoading', loadToken);
+						} else {
+							this.deleteLoading = false;
+						}
 					})
 				});
 			}

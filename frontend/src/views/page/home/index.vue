@@ -92,6 +92,7 @@
 	import JobList from './components/JobList.vue';
 	import pathSelect from './components/pathSelect.vue';
 	import { createDelayedLoadingController } from '@/utils/loadingFeedback';
+	import { createActionLoadingMap } from '@/utils/actionLoading';
 	import ManagementHero from '@/views/components/ManagementHero.vue';
 	export default {
 		name: 'Home',
@@ -172,6 +173,7 @@
 				loading: false,
 				hasLoaded: false,
 				loadingController: null,
+				actionLoadingMap: null,
 				jobRefreshTimer: null,
 				btnLoading: false,
 				editLoading: false,
@@ -244,12 +246,16 @@
 			if (this.loadingController) {
 				this.loadingController.dispose();
 			}
+			if (this.actionLoadingMap) {
+				this.actionLoadingMap.dispose();
+			}
 		},
 		created() {
 			this.loadingController = createDelayedLoadingController({
 				show: () => { this.loading = true; },
 				hide: () => { this.loading = false; }
 			});
+			this.actionLoadingMap = createActionLoadingMap();
 			this.getJobList();
 		},
 		methods: {
@@ -526,12 +532,16 @@
 					this.$message.error('如需手动执行，请先启用作业');
 					return
 				}
-				this.btnLoading = true;
+				const loadToken = this.actionLoadingMap ? this.actionLoadingMap.start(this, 'btnLoading') : 0;
 				jobPut({
 					id: row.id,
 					pause: pause
 				}).then(res => {
-					this.btnLoading = false;
+					if (this.actionLoadingMap) {
+						this.actionLoadingMap.finish(this, 'btnLoading', loadToken);
+					} else {
+						this.btnLoading = false;
+					}
 					this.$message({
 						message: res.msg,
 						type: 'success'
@@ -542,7 +552,11 @@
 						this.getJobList();
 					}
 				}).catch(err => {
-					this.btnLoading = false;
+					if (this.actionLoadingMap) {
+						this.actionLoadingMap.finish(this, 'btnLoading', loadToken);
+					} else {
+						this.btnLoading = false;
+					}
 				})
 			},
 			disableJobShow(row, disableIsDel) {
@@ -662,9 +676,13 @@
 						delete postData.timeWindowPreset;
 						postData.dstPath = postData.dstPath.join(':');
 						postData.exclude = postData.exclude.join(':');
-						this.editLoading = true;
+						const loadToken = this.actionLoadingMap ? this.actionLoadingMap.start(this, 'editLoading') : 0;
 						jobPost(postData).then(res => {
-							this.editLoading = false;
+							if (this.actionLoadingMap) {
+								this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+							} else {
+								this.editLoading = false;
+							}
 							this.$message({
 								message: res.msg,
 								type: 'success'
@@ -672,7 +690,11 @@
 							this.closeShow();
 							this.getJobList();
 						}).catch(err => {
-							this.editLoading = false;
+							if (this.actionLoadingMap) {
+								this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+							} else {
+								this.editLoading = false;
+							}
 						})
 					}
 				})
@@ -692,10 +714,14 @@
 				}
 			},
 			submitDisable() {
-				this.editLoading = true;
+				const loadToken = this.actionLoadingMap ? this.actionLoadingMap.start(this, 'editLoading') : 0;
 				if (this.disableIsDel) {
 					jobDelete(this.disableCu).then(res => {
-						this.editLoading = false;
+						if (this.actionLoadingMap) {
+							this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+						} else {
+							this.editLoading = false;
+						}
 						this.$message({
 							message: res.msg,
 							type: 'success'
@@ -703,11 +729,19 @@
 						this.getJobList();
 						this.closeDisableShow();
 					}).catch(err => {
-						this.editLoading = false;
+						if (this.actionLoadingMap) {
+							this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+						} else {
+							this.editLoading = false;
+						}
 					})
 				} else {
 					jobPut(this.disableCu).then(res => {
-						this.editLoading = false;
+						if (this.actionLoadingMap) {
+							this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+						} else {
+							this.editLoading = false;
+						}
 						this.$message({
 							message: res.msg,
 							type: 'success'
@@ -715,7 +749,11 @@
 						this.getJobList();
 						this.closeDisableShow();
 					}).catch(err => {
-						this.editLoading = false;
+						if (this.actionLoadingMap) {
+							this.actionLoadingMap.finish(this, 'editLoading', loadToken);
+						} else {
+							this.editLoading = false;
+						}
 					})
 				}
 			},

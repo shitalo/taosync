@@ -5,7 +5,7 @@
 			<div class="top-box-title">任务详情</div>
 			<div class="top-box-filters">
 				<el-select v-model="params.status" class="task-filter-select" placeholder="筛选状态" @change="getTaskItemList" clearable>
-					<el-option :label="item" :value="index" v-for="(item, index) in taskItemStatusList"></el-option>
+					<el-option :label="item" :value="index" v-for="(item, index) in taskItemStatusList" :key="index"></el-option>
 				</el-select>
 				<el-select v-model="params.type" class="task-filter-select task-filter-select-type" placeholder="筛选操作类型" @change="getTaskItemList" clearable>
 					<el-option label="复制/创建" :value="0"></el-option>
@@ -14,77 +14,116 @@
 				</el-select>
 			</div>
 			<menuRefresh class="top-box-refresh" :freshInterval="9973" :autoRefresh="false" :loading="loading" :needShow="1"
+				:busy="requesting"
 				@getData="getTaskItemList"></menuRefresh>
-			<!-- <el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getTaskItemList"></el-button> -->
 		</div>
-		<taskDetailTable class="table-page-box" :loading="loading" :taskItemData="taskItemData" @pageChange="pageChange"></taskDetailTable>
+		<taskDetailTable
+			class="table-page-box"
+			:loading="loading"
+			:hasLoaded="hasLoaded"
+			:taskItemData="taskItemData"
+			@pageChange="pageChange">
+		</taskDetailTable>
 	</div>
 </template>
 
 <script>
-	import {
-		jobGetTaskItem
-	} from "@/api/job";
-	import taskItemStatus from '@/utils/taskItemStatus';
-	import menuRefresh from './components/menuRefresh';
-	import taskDetailTable from "./components/taskDetailTable";
-	export default {
-		name: 'TaskDetail',
-		components: {
-			menuRefresh,
-			taskDetailTable
-		},
-		data() {
-			return {
-				taskItemData: {
-					dataList: [],
-					conut: 0
-				},
-				params: {
-					taskId: null,
-					pageSize: 10,
-					pageNum: 1,
-					status: null
-				},
-				loading: false,
-				btnLoading: false,
+import {
+	jobGetTaskItem
+} from "@/api/job";
+import taskItemStatus from '@/utils/taskItemStatus';
+import { createDelayedLoadingController } from '@/utils/loadingFeedback';
+import menuRefresh from './components/menuRefresh';
+import taskDetailTable from "./components/taskDetailTable";
+
+export default {
+	name: 'TaskDetail',
+	components: {
+		menuRefresh,
+		taskDetailTable
+	},
+	data() {
+		return {
+			taskItemData: {
+				dataList: [],
+				count: 0
+			},
+			params: {
 				taskId: null,
-				taskItemStatusList: []
-			};
-		},
-		created() {
-			if (this.$route.query.hasOwnProperty('taskId')) {
-				this.params.taskId = this.$route.query.taskId;
-			}
-			this.taskItemStatusList = taskItemStatus;
-		},
-		beforeDestroy() {},
+				pageSize: 10,
+				pageNum: 1,
+				status: null,
+				type: null
+			},
+			loading: false,
+			requesting: false,
+			hasLoaded: false,
+			btnLoading: false,
+			taskId: null,
+			taskItemStatusList: [],
+			loadingController: null
+		};
+	},
+	created() {
+		this.loadingController = createDelayedLoadingController({
+			show: () => { this.loading = true; },
+			hide: () => { this.loading = false; },
+			delay: 120,
+			minDuration: 180
+		});
+		if (this.$route.query.hasOwnProperty('taskId')) {
+			this.params.taskId = this.$route.query.taskId;
+		}
+		this.taskItemStatusList = taskItemStatus;
+	},
+	beforeDestroy() {
+		if (this.loadingController) {
+			this.loadingController.dispose();
+		}
+	},
 		methods: {
-			getTaskItemList() {
-				if (this.params.taskId != null) {
-					this.loading = true;
-					jobGetTaskItem(this.params).then(res => {
+		getTaskItemList(options = {}) {
+			if (this.params.taskId != null && !this.requesting) {
+				this.requesting = true;
+				const isManualRefresh = options && options.trigger === 'manual';
+				const loadToken = this.loadingController ? this.loadingController.start(isManualRefresh ? {
+					delay: 0,
+					minDuration: 360
+				} : undefined) : 0;
+				jobGetTaskItem(this.params).then(res => {
+					this.hasLoaded = true;
+					res.data.dataList.forEach(item => {
+						item.progress = parseInt(item.progress);
+						item.progress = item.progress < 100 ? item.progress : 100;
+					});
+					this.taskItemData = res.data;
+					this.requesting = false;
+					if (this.loadingController) {
+						this.loadingController.finish(loadToken);
+					} else {
 						this.loading = false;
-						res.data.dataList.forEach(item => {
-							item.progress = parseInt(item.progress);
-							item.progress = item.progress < 100 ? item.progress : 100;
-						})
-						this.taskItemData = res.data;
-					}).catch(err => {
+					}
+				}).catch(() => {
+					this.hasLoaded = true;
+					this.requesting = false;
+					if (this.loadingController) {
+						this.loadingController.finish(loadToken);
+					} else {
 						this.loading = false;
-					})
-				}
-			},
-			goback() {
-				this.$router.go(-1);
-			},
-			pageChange(val) {
-				this.params.pageSize = val.pageSize;
-				this.params.pageNum = val.pageNum;
-				this.getTaskItemList();
+					}
+				});
 			}
+		},
+		goback() {
+			this.$router.go(-1);
+		},
+		pageChange(val) {
+			this.params.pageSize = val.pageSize;
+			this.params.pageNum = val.pageNum;
+			this.getTaskItemList();
 		}
 	}
+}
 </script>
 
 <style lang="scss" scoped>
@@ -140,7 +179,6 @@
 		}
 	}
 
-	// 移动端适配
 	@media (max-width: 768px) {
 		.taskDetail {
 			padding: 12px;
