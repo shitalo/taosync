@@ -1,9 +1,9 @@
 <template>
 	<div class="task">
 		<div class="top-box">
-			<el-button class="tao-back-button" type="primary" icon="el-icon-back" size="small" @click="goback">返回</el-button>
+			<el-button class="tao-back-button top-box-back" type="primary" icon="el-icon-back" size="small" @click="goback">返回</el-button>
 			<div class="top-box-title">作业详情</div>
-			<menuRefresh :loading="loading" :busy="requesting" :autoRefresh="false" :needShow="1" @getData="getTaskList"></menuRefresh>
+			<menuRefresh class="top-box-refresh" :loading="loading" :busy="requesting" :autoRefresh="false" :needShow="1" @getData="getTaskList"></menuRefresh>
 		</div>
 		<div class="task-content">
 			<div class="table-box">
@@ -335,14 +335,40 @@ export default {
 		overflow: hidden;
 
 		.top-box {
-			display: flex;
+			display: grid;
+			grid-template-columns: auto minmax(0, 1fr) auto;
 			align-items: center;
-			justify-content: space-between;
+			column-gap: 14px;
 			margin-bottom: 16px;
 			flex-shrink: 0;
+			min-height: 40px;
 
 			.top-box-title {
+				grid-column: 1 / -1;
+				grid-row: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				align-self: stretch;
+				justify-self: center;
 				font-weight: bold;
+				text-align: center;
+				white-space: nowrap;
+				max-width: calc(100% - 180px);
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			.top-box-back {
+				grid-column: 1;
+				grid-row: 1;
+				z-index: 1;
+			}
+
+			.top-box-refresh {
+				grid-column: 3;
+				grid-row: 1;
+				justify-self: end;
 			}
 		}
 

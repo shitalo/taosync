@@ -1,9 +1,8 @@
 <template>
 	<div class="taskCurrentDetail">
 		<div class="top-box">
-			<el-button class="tao-back-button" type="primary" icon="el-icon-back" @click="goback" size="small">返回</el-button>
+			<el-button class="tao-back-button top-box-back" type="primary" icon="el-icon-back" @click="goback" size="small">返回</el-button>
 			<div class="top-box-title">实时任务详情</div>
-			<div class="top-box-spacer"></div>
 		</div>
 		<taskCurrent
 			v-if="!finished"
@@ -83,19 +82,34 @@
 		overflow: hidden;
 
 		.top-box {
-			display: flex;
+			display: grid;
+			grid-template-columns: auto minmax(0, 1fr) auto;
 			align-items: center;
-			justify-content: space-between;
+			column-gap: 14px;
 			margin-bottom: 16px;
 			flex: 0 0 auto;
+			min-height: 40px;
 
 			.top-box-title {
+				grid-column: 1 / -1;
+				grid-row: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				align-self: stretch;
+				justify-self: center;
 				font-weight: bold;
+				text-align: center;
+				white-space: nowrap;
+				max-width: calc(100% - 180px);
+				overflow: hidden;
+				text-overflow: ellipsis;
 			}
 
-			.top-box-spacer {
-				width: 72px;
-				height: 1px;
+			.top-box-back {
+				grid-column: 1;
+				grid-row: 1;
+				z-index: 1;
 			}
 		}
 
@@ -165,13 +179,29 @@
 
 			.top-box {
 				margin-bottom: 12px;
+				grid-template-columns: auto minmax(0, 1fr);
 
 				.top-box-title {
+					grid-column: 1 / -1;
+					grid-row: 1;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					align-self: stretch;
+					justify-self: center;
 					font-size: 16px;
+					text-align: center;
+					white-space: nowrap;
+					min-width: 0;
+					max-width: calc(100% - 92px);
+					overflow: hidden;
+					text-overflow: ellipsis;
 				}
 
-				.top-box-spacer {
-					width: 64px;
+				.top-box-back {
+					grid-column: 1;
+					grid-row: 1;
+					z-index: 1;
 				}
 			}
 
