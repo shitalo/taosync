@@ -1,6 +1,6 @@
 <template>
 	<div class="taskDetailTable">
-		<div class="card-list-container" v-loading="loading && hasRows" element-loading-text="正在刷新明细...">
+		<div class="card-list-container">
 			<div v-if="!hasRows" class="state-panel" :class="{ 'is-loading': stateLoading, 'is-empty': !stateLoading }">
 				<div class="state-mark">
 					<i :class="stateLoading ? 'el-icon-loading' : 'el-icon-document-remove'"></i>
@@ -138,7 +138,7 @@ export default {
 			return !!(this.taskItemData && this.taskItemData.dataList && this.taskItemData.dataList.length > 0);
 		},
 		stateLoading() {
-			return !this.hasLoaded || this.loading;
+			return !this.hasLoaded || (this.loading && !this.hasRows);
 		},
 		stateTitle() {
 			return this.stateLoading ? this.loadingTitle : this.emptyTitle;
@@ -511,25 +511,45 @@ export default {
 			.form-box {
 				padding: 14px 18px;
 				display: grid;
-				gap: 10px;
+				gap: 8px;
 
 				.form-box-item {
-					display: grid;
-					grid-template-columns: 88px minmax(0, 1fr);
-					align-items: start;
-					gap: 10px;
+					display: flex;
+					flex-direction: column;
+					gap: 6px;
+					padding: 10px 12px;
+					border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
+					border-radius: 12px;
+					background: color-mix(in srgb, var(--bg-primary) 72%, var(--bg-secondary));
+					min-width: 0;
+					align-items: stretch;
+					text-align: left;
 
 					.form-box-item-label {
+						display: block;
 						font-size: 12px;
 						color: var(--text-muted);
-						line-height: 1.6;
+						line-height: 1.4;
+						font-weight: 600;
+						width: 100%;
+						padding: 0;
+						margin: 0;
+						text-align: left;
 					}
 
 					.form-box-item-value {
+						display: block;
 						font-size: 13px;
 						color: var(--text-primary);
 						line-height: 1.6;
-						word-break: break-all;
+						min-width: 0;
+						width: 100%;
+						padding: 0;
+						margin: 0;
+						text-align: left;
+						white-space: normal;
+						word-break: break-word;
+						overflow-wrap: anywhere;
 					}
 				}
 			}
@@ -593,11 +613,6 @@ export default {
 
 			.form-box {
 				padding: 12px 14px;
-
-				.form-box-item {
-					grid-template-columns: 1fr;
-					gap: 4px;
-				}
 			}
 
 			.page {

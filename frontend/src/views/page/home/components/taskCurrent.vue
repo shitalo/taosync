@@ -174,20 +174,14 @@
 				return !this.hasLoaded || this.loading;
 			},
 			taskListEmptyTitle() {
-				if (this.current && !this.current.scanFinish && this.current.firstSync === null) {
+				if (this.cuTaskSelect === 1 && this.current && this.current.firstSync === null) {
 					return '扫描中，暂未发现明细';
 				}
-				if (this.current && !this.current.scanFinish) {
-					return '当前筛选下暂无明细';
-				}
-				return '当前没有明细记录';
+				return '当前筛选下暂无明细';
 			},
 			taskListEmptyDesc() {
-				if (this.current && !this.current.scanFinish && this.current.firstSync === null) {
+				if (this.cuTaskSelect === 1 && this.current && this.current.firstSync === null) {
 					return '系统正在扫描待同步内容，发现文件后会自动出现在这里。';
-				}
-				if (this.current && !this.current.scanFinish) {
-					return '扫描仍在继续，符合当前筛选条件的明细出现后会自动展示。';
 				}
 				return '当前筛选条件下没有匹配记录，换个条件再看。';
 			}
@@ -200,6 +194,7 @@
 				taskListHasLoaded: true,
 				isFetchingCurrent: false,
 				isFetchingTaskList: false,
+				taskListRequestToken: 0,
 				timer: null,
 				hideTimer: null,
 				finishTimer: null,
@@ -251,7 +246,7 @@
 				this.getCurrent();
 				this.timer = setInterval(() => {
 					this.getCurrent();
-				}, 610);
+				}, 1200);
 			},
 			endRefresh() {
 				if (this.timer) {
@@ -350,15 +345,28 @@
 					return;
 				}
 				const silent = options.silent === true;
+				const requestStatus = this.cuTaskSelect;
+				const requestToken = ++this.taskListRequestToken;
 				this.isFetchingTaskList = true;
-				if (!silent && this.cuTaskList.length === 0) {
+				if (!silent) {
+					this.cuTaskList = [];
 					this.taskListHasLoaded = false;
 				}
 				const loadToken = !silent && this.taskListLoadingController ? this.taskListLoadingController.start() : 0;
 				jobGetTaskCurrent({
 					id: this.jobId,
-					status: this.cuTaskSelect
+					status: requestStatus
 				}).then(res => {
+					const isLatestRequest = requestToken === this.taskListRequestToken;
+					const isSameStatus = this.cuTaskSelect === requestStatus;
+					if (!isLatestRequest || !isSameStatus) {
+						if (!silent && this.taskListLoadingController) {
+							this.taskListLoadingController.finish(loadToken);
+						} else if (!silent) {
+							this.loadingTask = false;
+						}
+						return;
+					}
 					this.cuTaskList = res.data || [];
 					this.taskListHasLoaded = true;
 					this.isFetchingTaskList = false;
@@ -368,6 +376,16 @@
 						this.loadingTask = false;
 					}
 				}).catch(() => {
+					const isLatestRequest = requestToken === this.taskListRequestToken;
+					const isSameStatus = this.cuTaskSelect === requestStatus;
+					if (!isLatestRequest || !isSameStatus) {
+						if (!silent && this.taskListLoadingController) {
+							this.taskListLoadingController.finish(loadToken);
+						} else if (!silent) {
+							this.loadingTask = false;
+						}
+						return;
+					}
 					this.taskListHasLoaded = true;
 					this.isFetchingTaskList = false;
 					if (!silent && this.taskListLoadingController) {
@@ -407,9 +425,16 @@
 				if (this.cuTaskSelect === status || this.current === null) {
 					return;
 				}
+				this.taskListRequestToken += 1;
+				this.isFetchingTaskList = false;
 				this.cuTaskSelect = status;
 				this.toTableParams.pageNum = 1;
 				if (status === 1) {
+					if (this.taskListLoadingController) {
+						this.taskListLoadingController.dispose();
+					} else {
+						this.loadingTask = false;
+					}
 					this.cuTaskList = this.current.doingTask || [];
 					this.taskListHasLoaded = true;
 				} else {
